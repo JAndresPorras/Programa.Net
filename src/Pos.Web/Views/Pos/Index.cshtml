@@ -1,0 +1,253 @@
+@model PosIndexViewModel
+@{
+    ViewData["Title"] = "Punto de venta";
+    var c = Model.Currency;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/pos.css" asp-append-version="true" />
+}
+
+<h1 class="visually-hidden">Punto de venta</h1>
+<div class="pos">
+    <!-- ============================ Columna izquierda: escaneo y ticket -->
+    <div class="pos__left">
+        @if (Model.OpenSession is null)
+        {
+            <div class="till-bar no-print">
+                <svg class="icon"><use href="#i-alert"></use></svg>
+                <span>
+                    No tiene caja abierta. Puede vender igual, pero para la entrega del día
+                    conviene <a asp-controller="Cash" asp-action="Index">abrir la caja</a>.
+                </span>
+            </div>
+        }
+        else
+        {
+            <div class="till-bar till-bar--open no-print">
+                <svg class="icon"><use href="#i-check-circle"></use></svg>
+                <span>
+                    Caja abierta desde las @Model.OpenSession.OpenedAt.ToLocalTime().ToString("HH:mm")
+                    con un fondo de <b>@c.Format(Model.OpenSession.OpeningAmount)</b>.
+                    <a asp-controller="Cash" asp-action="Index">Ver caja del día</a>
+                </span>
+            </div>
+        }
+
+        <div class="scanbox" id="scanBox">
+            <div class="scanbox__icon"><svg class="icon icon-xl"><use href="#i-scan"></use></svg></div>
+            <div class="scanbox__field">
+                <label for="scanInput">Código de barras</label>
+                <input type="text" id="scanInput" autocomplete="off" spellcheck="false"
+                       placeholder="Dispare la pistola o escriba el código y pulse Enter" />
+            </div>
+            <div class="text-end">
+                <button type="button" class="btn btn-soft btn-sm" id="btnSearch">
+                    <svg class="icon"><use href="#i-search"></use></svg> Buscar <kbd>F4</kbd>
+                </button>
+                <div class="scanbox__hint mt-1">
+                    <kbd>F2</kbd> cobrar &nbsp; <kbd>F8</kbd> vaciar
+                </div>
+            </div>
+        </div>
+
+        <div class="ticket">
+            <div class="ticket__head">
+                <svg class="icon" style="color:var(--primary)"><use href="#i-cart"></use></svg>
+                <h2 class="ticket__title">Ticket en curso</h2>
+                <span class="chip" id="ticketCount">0 productos</span>
+                <div class="ms-auto">
+                    <button type="button" class="btn btn-soft btn-sm" id="btnClear">
+                        <svg class="icon"><use href="#i-trash"></use></svg> Vaciar
+                    </button>
+                </div>
+            </div>
+            <div class="ticket__scroll">
+                <table>
+                    <thead>
+                    <tr>
+                        <th style="width:44%">Producto</th>
+                        <th class="t-right" style="width:15%">Precio</th>
+                        <th class="t-center" style="width:20%">Cantidad</th>
+                        <th class="t-right" style="width:16%">Total</th>
+                        <th style="width:5%"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="ticketBody"></tbody>
+                </table>
+                <div class="empty" id="ticketEmpty">
+                    <svg class="icon"><use href="#i-scan"></use></svg>
+                    <p><b>Listo para escanear.</b><br />Dispare la pistola sobre el código de barras del producto.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================ Columna derecha: cobro -->
+    <div class="pos__right">
+        <div class="pay">
+            <div class="pay__totals">
+                <div class="pay__row"><span>Subtotal</span><b id="sumSubtotal">@Model.Cart.SubtotalText</b></div>
+                <div class="pay__row" id="rowDiscount" style="display:none">
+                    <span>Descuento</span><b class="text-danger" id="sumDiscount">-</b>
+                </div>
+                <div class="pay__row"><span>Unidades</span><b id="sumUnits">0</b></div>
+                <div class="pay__total">
+                    <span>Total</span>
+                    <b id="sumTotal">@Model.Cart.TotalText</b>
+                </div>
+            </div>
+
+            @if (Model.CanDiscount)
+            {
+                <div>
+                    <label class="pay__label" for="discountInput">Descuento sobre el total (@c.Symbol)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">@c.Symbol</span>
+                        <input type="number" class="form-control" id="discountInput"
+                               min="0" step="@(c.Decimals == 0 ? "1" : "0.01")" value="0" />
+                        <button class="btn btn-soft" type="button" id="btnDiscount">Aplicar</button>
+                    </div>
+                </div>
+            }
+
+            <div>
+                <label class="pay__label">Forma de pago</label>
+                <div class="pay-methods">
+                    <button type="button" class="pay-method is-active" data-method="Cash">
+                        <svg class="icon"><use href="#i-cash"></use></svg> Efectivo
+                    </button>
+                    <button type="button" class="pay-method" data-method="Card">
+                        <svg class="icon"><use href="#i-receipt"></use></svg> Tarjeta
+                    </button>
+                    <button type="button" class="pay-method" data-method="Transfer">
+                        <svg class="icon"><use href="#i-coins"></use></svg> Transferencia
+                    </button>
+                    <button type="button" class="pay-method" data-method="Mixed">
+                        <svg class="icon"><use href="#i-file"></use></svg> Mixto
+                    </button>
+                </div>
+            </div>
+
+            <div id="cashBlock">
+                <label class="pay__label" for="receivedInput">Dinero recibido del cliente</label>
+                <div class="input-group">
+                    <span class="input-group-text fs-5">@c.Symbol</span>
+                    <input type="number" class="form-control received-input" id="receivedInput"
+                           min="0" step="@(c.Decimals == 0 ? "1" : "0.01")" placeholder="0" />
+                </div>
+                <div class="quick-grid" id="quickGrid"></div>
+            </div>
+
+            <!-- Vuelto que hay que devolver al cliente -->
+            <div class="change-box" id="changeBox">
+                <span>Vuelto</span>
+                <b id="changeValue">@c.Format(0)</b>
+            </div>
+
+            <div class="mt-auto">
+                <button type="button" class="btn btn-success btn-checkout" id="btnCheckout" disabled>
+                    <svg class="icon icon-lg"><use href="#i-print"></use></svg>
+                    Cerrar venta e imprimir &nbsp;<kbd>F2</kbd>
+                </button>
+                <div class="text-center fs-11 text-muted-x mt-2">
+                    El recibo se imprime automáticamente al cerrar la venta.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================ Modal: buscar producto -->
+<div class="modal fade" id="searchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <svg class="icon"><use href="#i-search"></use></svg> Buscar producto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-8">
+                        <input type="text" class="form-control" id="searchTerm"
+                               placeholder="Nombre, código de producto o código de barras..." />
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="searchCategory">
+                            <option value="">Todas las categorías</option>
+                            @foreach (var cat in Model.Categories)
+                            {
+                                <option value="@cat.Id">@cat.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="search-results" id="searchResults"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================ Modal: vuelto a entregar -->
+<div class="modal fade" id="changeModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body p-4">
+                <div class="change-result">
+                    <div class="text-center mb-2">
+                        <svg class="icon icon-xl" style="color:var(--success)"><use href="#i-check-circle"></use></svg>
+                    </div>
+                    <div class="change-result__label">Entregue de vuelto</div>
+                    <div class="change-result__amount" id="modalChange">@c.Format(0)</div>
+                    <div class="fs-13 text-muted-x">Recibo <b id="modalNumber"></b></div>
+
+                    <div class="change-result__grid">
+                        <div><small>Total</small><b id="modalTotal"></b></div>
+                        <div><small>Recibido</small><b id="modalReceived"></b></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a class="btn btn-soft" id="modalPrintLink" target="_blank" rel="noopener">
+                    <svg class="icon"><use href="#i-print"></use></svg> Reimprimir recibo
+                </a>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="btnNextSale">
+                    <svg class="icon"><use href="#i-scan"></use></svg> Nueva venta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Marco fuera de pantalla: un iframe con display:none no se pagina al imprimir. *@
+<iframe id="printFrame" title="Impresión del recibo" aria-hidden="true"
+        style="position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0"></iframe>
+
+@section Scripts {
+    <script>
+        window.POS_CONFIG = {
+            currency: {
+                code: '@c.Code',
+                symbol: '@c.Symbol',
+                decimals: @c.Decimals
+            },
+            canDiscount: @Model.CanDiscount.ToString().ToLowerInvariant(),
+            urls: {
+                scan: '@Url.Action("Scan")',
+                addProduct: '@Url.Action("AddProduct")',
+                setQuantity: '@Url.Action("SetQuantity")',
+                remove: '@Url.Action("Remove")',
+                clear: '@Url.Action("Clear")',
+                discount: '@Url.Action("SetDiscount")',
+                search: '@Url.Action("Search")',
+                checkout: '@Url.Action("Checkout")'
+            },
+            initialCart: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Cart,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }))
+        };
+    </script>
+    @Html.AntiForgeryToken()
+    <script src="~/js/pos.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,81 @@
+@model List<RolePermissionsViewModel>
+
+<div class="page-head">
+    <div>
+        <h1>Permisos por rol</h1>
+        <p>Lo que marque aquí lo pueden hacer todos los usuarios de ese rol.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="Index">
+            <svg class="icon"><use href="#i-back"></use></svg> Volver a usuarios
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    @foreach (var role in Model)
+    {
+        var isAdmin = role.RoleName == Roles.Admin;
+        <div class="col-xl-4 col-lg-6">
+            <form asp-action="RolesPermissions" method="post" class="h-100">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="roleId" value="@role.RoleId" />
+
+                <div class="card-x h-100 d-flex flex-column">
+                    <div class="card-x__head">
+                        <svg class="icon" style="color:var(--primary)"><use href="#i-shield"></use></svg>
+                        <div>
+                            <h2 class="card-x__title">@role.RoleName</h2>
+                            <div class="fs-11 text-muted-x">@role.Description</div>
+                        </div>
+                        <span class="chip ms-auto">@role.UserCount usuarios</span>
+                    </div>
+
+                    <div class="card-x__body" style="flex:1;max-height:460px;overflow-y:auto">
+                        @if (isAdmin)
+                        {
+                            <div class="alert alert-warning mb-0">
+                                <svg class="icon"><use href="#i-lock"></use></svg>
+                                <div class="fs-12">
+                                    El rol Administrador siempre tiene todos los permisos del sistema
+                                    y no se puede limitar, para no dejar el sistema sin acceso.
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            foreach (var group in Permissions.Grouped)
+                            {
+                                <div class="fs-11 text-uppercase fw-bold text-muted-x mb-1 mt-2"
+                                     style="letter-spacing:.06em">@group.Key</div>
+                                foreach (var permission in group)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="permissions"
+                                               value="@permission.Value"
+                                               id="r@(role.RoleId)_@permission.Value.Replace('.', '_')"
+                                               checked="@role.Permissions.Contains(permission.Value)" />
+                                        <label class="form-check-label fs-13"
+                                               for="r@(role.RoleId)_@permission.Value.Replace('.', '_')"
+                                               title="@permission.Description">
+                                            @permission.Name
+                                        </label>
+                                    </div>
+                                }
+                            }
+                        }
+                    </div>
+
+                    @if (!isAdmin)
+                    {
+                        <div class="card-x__foot">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <svg class="icon"><use href="#i-save"></use></svg> Guardar permisos de @role.RoleName
+                            </button>
+                        </div>
+                    }
+                </div>
+            </form>
+        </div>
+    }
+</div>

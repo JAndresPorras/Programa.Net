@@ -1,0 +1,229 @@
+@model CashSession
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var summary = ViewBag.Summary as CashSessionSummary;
+    var defaultFloat = (decimal)ViewBag.DefaultFloat;
+    var step = c.Decimals == 0 ? "1" : "0.01";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Caja del día</h1>
+        <p>Abra la caja al comenzar el turno y ciérrela al final para entregar el dinero al dueño.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="History">
+            <svg class="icon"><use href="#i-history"></use></svg> Historial de cajas
+        </a>
+        @if (Model is not null && User.HasPermission(Permissions.CashClose))
+        {
+            <a class="btn btn-primary" asp-action="Close" asp-route-id="@Model.Id">
+                <svg class="icon"><use href="#i-cash"></use></svg> Cerrar y entregar caja
+            </a>
+        }
+    </div>
+</div>
+
+@if (Model is null)
+{
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card-x">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--warning)"><use href="#i-cash"></use></svg>
+                    <h2 class="card-x__title">Abrir caja</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="alert alert-info mb-3">
+                        <svg class="icon"><use href="#i-info"></use></svg>
+                        <div>
+                            No tiene una caja abierta. Registre el sencillo con el que arranca el turno
+                            para que al cierre el sistema calcule exactamente cuánto entregar.
+                        </div>
+                    </div>
+
+                    @if (User.HasPermission(Permissions.CashOpen))
+                    {
+                        <form asp-action="Open" method="post">
+                            @Html.AntiForgeryToken()
+                            <div class="mb-3">
+                                <label class="form-label" for="openingAmount">Fondo inicial (sencillo en caja)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">@c.Symbol</span>
+                                    <input type="number" class="form-control received-input" id="openingAmount"
+                                           name="openingAmount" min="0" step="@step"
+                                           value="@defaultFloat" data-autofocus />
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="notes">Observaciones (opcional)</label>
+                                <input type="text" class="form-control" id="notes" name="notes" />
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <svg class="icon"><use href="#i-check"></use></svg> Abrir caja
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="text-soft mb-0">No tiene el permiso para abrir caja. Solicítelo al administrador.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (summary is not null)
+{
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+            <div class="stat">
+                <div class="stat__label">Fondo inicial</div>
+                <div class="stat__value">@c.Format(summary.OpeningAmount)</div>
+                <div class="stat__hint">Abierta @Model.OpenedAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="stat stat--success">
+                <div class="stat__label">Ventas en efectivo</div>
+                <div class="stat__value">@c.Format(summary.CashSales)</div>
+                <div class="stat__hint">@summary.SalesCount recibos</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="stat stat--info">
+                <div class="stat__label">Otros medios de pago</div>
+                <div class="stat__value">@c.Format(summary.CardSales + summary.TransferSales + summary.OtherSales)</div>
+                <div class="stat__hint">Tarjeta y transferencias</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="stat stat--warning">
+                <div class="stat__label">Debe haber en caja</div>
+                <div class="stat__value">@c.Format(summary.ExpectedCash)</div>
+                <div class="stat__hint">Fondo + efectivo + movimientos</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--primary)"><use href="#i-box"></use></svg>
+                    <h2 class="card-x__title">Productos vendidos en el turno</h2>
+                    <span class="chip ms-auto">@EscPosPrinter.FormatQuantity(summary.UnitsSold) unidades</span>
+                </div>
+                @if (summary.Products.Count == 0)
+                {
+                    <div class="empty">
+                        <svg class="icon"><use href="#i-cart"></use></svg>
+                        <p>Todavía no hay ventas en este turno.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="table-x">
+                            <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Categoría</th>
+                                <th class="t-center">Cantidad</th>
+                                <th class="t-right">Importe</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in summary.Products)
+                            {
+                                <tr>
+                                    <td><b>@row.Name</b><div class="fs-11 text-muted-x num">@row.Code</div></td>
+                                    <td class="fs-13">@row.CategoryName</td>
+                                    <td class="t-center num">@EscPosPrinter.FormatQuantity(row.Quantity) @row.Unit</td>
+                                    <td class="t-right money"><b>@c.Format(row.Total)</b></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            @if (User.HasPermission(Permissions.CashMovements))
+            {
+                <div class="card-x mb-3">
+                    <div class="card-x__head">
+                        <svg class="icon" style="color:var(--warning)"><use href="#i-coins"></use></svg>
+                        <h2 class="card-x__title">Ingreso o retiro de efectivo</h2>
+                    </div>
+                    <div class="card-x__body">
+                        <form asp-action="Movement" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="sessionId" value="@Model.Id" />
+                            <div class="row g-2">
+                                <div class="col-5">
+                                    <label class="form-label" for="type">Tipo</label>
+                                    <select class="form-select" id="type" name="type">
+                                        <option value="In">Ingreso</option>
+                                        <option value="Out">Retiro</option>
+                                    </select>
+                                </div>
+                                <div class="col-7">
+                                    <label class="form-label" for="amount">Monto</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">@c.Symbol</span>
+                                        <input type="number" class="form-control" id="amount" name="amount"
+                                               min="@step" step="@step" required />
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="reason">Motivo</label>
+                                    <input type="text" class="form-control" id="reason" name="reason" required
+                                           placeholder="Ej. compra de bolsas, pago a proveedor" />
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-soft mt-3">
+                                <svg class="icon"><use href="#i-plus"></use></svg> Registrar movimiento
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            }
+
+            <div class="card-x">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--info)"><use href="#i-history"></use></svg>
+                    <h2 class="card-x__title">Movimientos del turno</h2>
+                </div>
+                @if (Model.Movements.Count == 0)
+                {
+                    <div class="empty"><p>Sin ingresos ni retiros registrados.</p></div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="table-x">
+                            <thead>
+                            <tr><th>Hora</th><th>Motivo</th><th class="t-right">Monto</th></tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var m in Model.Movements.OrderByDescending(x => x.CreatedAt))
+                            {
+                                <tr>
+                                    <td class="num fs-12">@m.CreatedAt.ToLocalTime().ToString("HH:mm")</td>
+                                    <td class="fs-13">@m.Reason<div class="fs-11 text-muted-x">@m.UserName</div></td>
+                                    <td class="t-right money @(m.Type == CashMovementType.In ? "text-success" : "text-danger")">
+                                        @(m.Type == CashMovementType.In ? "+" : "-")@c.Format(m.Amount)
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}

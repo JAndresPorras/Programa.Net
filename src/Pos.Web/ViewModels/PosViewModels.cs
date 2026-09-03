@@ -1,0 +1,115 @@
+using Pos.Web.Models;
+using Pos.Web.Services;
+
+namespace Pos.Web.ViewModels;
+
+/// <summary>Estado del ticket que se devuelve al navegador tras cada escaneo.</summary>
+public class CartStateDto
+{
+    public List<CartLineDto> Lines { get; set; } = [];
+    public decimal Subtotal { get; set; }
+    public decimal Discount { get; set; }
+    public decimal Total { get; set; }
+    public decimal Units { get; set; }
+    public int LineCount { get; set; }
+    public string SubtotalText { get; set; } = string.Empty;
+    public string DiscountText { get; set; } = string.Empty;
+    public string TotalText { get; set; } = string.Empty;
+    public List<QuickAmountDto> QuickAmounts { get; set; } = [];
+
+    public static CartStateDto From(Cart cart, CurrencyInfo currency) => new()
+    {
+        Lines = cart.Lines.Select(l => CartLineDto.From(l, currency)).ToList(),
+        Subtotal = currency.Round(cart.Subtotal),
+        Discount = currency.Round(cart.DiscountAmount),
+        Total = currency.Round(cart.Total),
+        Units = cart.TotalItems,
+        LineCount = cart.Lines.Count,
+        SubtotalText = currency.Format(cart.Subtotal),
+        DiscountText = currency.Format(cart.DiscountAmount),
+        TotalText = currency.Format(cart.Total),
+        QuickAmounts = currency.QuickAmounts(currency.Round(cart.Total))
+            .Select(a => new QuickAmountDto { Value = a, Text = currency.Format(a) })
+            .ToList()
+    };
+}
+
+public class QuickAmountDto
+{
+    public decimal Value { get; set; }
+    public string Text { get; set; } = string.Empty;
+}
+
+public class CartLineDto
+{
+    public int ProductId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = string.Empty;
+    public decimal UnitPrice { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal LineTotal { get; set; }
+    public string Unit { get; set; } = "UND";
+    public bool SoldByWeight { get; set; }
+    public string? ImagePath { get; set; }
+    public string UnitPriceText { get; set; } = string.Empty;
+    public string LineTotalText { get; set; } = string.Empty;
+    public string QuantityText { get; set; } = string.Empty;
+
+    public static CartLineDto From(CartLine l, CurrencyInfo currency) => new()
+    {
+        ProductId = l.ProductId,
+        Code = l.Code,
+        Name = l.Name,
+        CategoryName = l.CategoryName,
+        UnitPrice = l.UnitPrice,
+        Quantity = l.Quantity,
+        LineTotal = currency.Round(l.LineTotal),
+        Unit = l.Unit,
+        SoldByWeight = l.SoldByWeight,
+        ImagePath = l.ImagePath,
+        UnitPriceText = currency.Format(l.UnitPrice),
+        LineTotalText = currency.Format(l.LineTotal),
+        QuantityText = EscPosPrinter.FormatQuantity(l.Quantity)
+    };
+}
+
+/// <summary>Respuesta estandar de las llamadas del punto de venta.</summary>
+public class PosResponse
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public string? MessageKind { get; set; }
+    public CartStateDto? Cart { get; set; }
+    public object? Data { get; set; }
+
+    public static PosResponse Ok(CartStateDto cart, string? message = null) =>
+        new() { Success = true, Cart = cart, Message = message, MessageKind = "success" };
+
+    public static PosResponse Fail(string message) =>
+        new() { Success = false, Message = message, MessageKind = "danger" };
+}
+
+public class PosIndexViewModel
+{
+    public CartStateDto Cart { get; set; } = new();
+    public CurrencyInfo Currency { get; set; } = CurrencyInfo.Pen;
+    public CashSession? OpenSession { get; set; }
+    public bool CanDiscount { get; set; }
+    public bool StockControl { get; set; }
+    public List<Category> Categories { get; set; } = [];
+    public decimal DefaultOpeningFloat { get; set; }
+}
+
+public record ScanRequest(string? Barcode, decimal Quantity = 1);
+public record QuantityRequest(int ProductId, decimal Quantity);
+public record ProductRequest(int ProductId, decimal Quantity = 1);
+public record DiscountRequest(decimal Amount);
+
+public record CheckoutApiRequest(
+    decimal AmountReceived,
+    decimal Discount,
+    string PaymentMethod,
+    string? CustomerName,
+    string? CustomerDocument,
+    string? Notes);

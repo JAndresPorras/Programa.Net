@@ -1,0 +1,260 @@
+@model ProductFormViewModel
+@inject ISettingsService SettingsService
+@{
+    var c = SettingsService.Current.Currency;
+    var isEdit = Model.Id > 0;
+    var step = c.Decimals == 0 ? "1" : "0.01";
+}
+
+<div class="page-head">
+    <div>
+        <h1>@(isEdit ? "Editar producto" : "Nuevo producto")</h1>
+        <p>Los códigos de barras que registre aquí son los que reconocerá la pistola en el punto de venta.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="Index">
+            <svg class="icon"><use href="#i-back"></use></svg> Volver
+        </a>
+    </div>
+</div>
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" method="post" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+    <input type="hidden" asp-for="OriginalPrice" />
+
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--primary)"><use href="#i-box"></use></svg>
+                    <h2 class="card-x__title">Datos del producto</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label asp-for="Code" class="form-label"></label>
+                            <input asp-for="Code" class="form-control num" placeholder="Ej. PAN-001" />
+                            <span asp-validation-for="Code" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-8">
+                            <label asp-for="Name" class="form-label"></label>
+                            <input asp-for="Name" class="form-control" placeholder="Ej. Pan francés (unidad)" />
+                            <span asp-validation-for="Name" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CategoryId" class="form-label"></label>
+                            <select asp-for="CategoryId" class="form-select">
+                                <option value="">— Seleccione —</option>
+                                @foreach (var cat in Model.Categories)
+                                {
+                                    <option value="@cat.Id" selected="@(Model.CategoryId == cat.Id)">@cat.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="CategoryId" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="Unit" class="form-label"></label>
+                            <select asp-for="Unit" class="form-select">
+                                @foreach (var u in new[] { "UND", "KG", "GR", "LT", "ML", "PQT", "CJA", "DOC" })
+                                {
+                                    <option value="@u" selected="@(Model.Unit == u)">@u</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input asp-for="SoldByWeight" class="form-check-input" />
+                                <label asp-for="SoldByWeight" class="form-check-label fs-13"></label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label"></label>
+                            <textarea asp-for="Description" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--primary)"><use href="#i-scan"></use></svg>
+                    <h2 class="card-x__title">Códigos de barras</h2>
+                </div>
+                <div class="card-x__body">
+                    <label asp-for="BarcodesRaw" class="form-label">
+                        Códigos de barras (uno por línea)
+                    </label>
+                    <textarea asp-for="BarcodesRaw" class="form-control num" rows="3"
+                              placeholder="7750001000015&#10;7750001000022"
+                              id="barcodesRaw"></textarea>
+                    <div class="form-hint">
+                        Puede dispararle con la misma pistola dentro de este cuadro. El primer código de la
+                        lista queda como el principal. Un producto puede tener varios códigos.
+                    </div>
+                    <span asp-validation-for="BarcodesRaw" class="text-danger"></span>
+                </div>
+            </div>
+
+            @if (isEdit && Model.PriceHistory.Count > 0)
+            {
+                <div class="card-x">
+                    <div class="card-x__head">
+                        <svg class="icon" style="color:var(--warning)"><use href="#i-history"></use></svg>
+                        <h2 class="card-x__title">Últimos cambios de precio</h2>
+                        <a class="ms-auto fs-12" asp-action="History" asp-route-id="@Model.Id">Ver historial completo</a>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="table-x">
+                            <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Usuario</th>
+                                <th class="t-right">Antes</th>
+                                <th class="t-right">Después</th>
+                                <th class="t-right">Variación</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var h in Model.PriceHistory.Take(5))
+                            {
+                                <tr>
+                                    <td class="num fs-12">@h.ChangedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@h.ChangedByUserName</td>
+                                    <td class="t-right money">@c.Format(h.OldPrice)</td>
+                                    <td class="t-right money"><b>@c.Format(h.NewPrice)</b></td>
+                                    <td class="t-right num">
+                                        <span class="chip @(h.Difference >= 0 ? "chip--danger" : "chip--success")">
+                                            @(h.Difference >= 0 ? "+" : "")@h.PercentChange.ToString("0.##")%
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--success)"><use href="#i-coins"></use></svg>
+                    <h2 class="card-x__title">Precio y stock</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="mb-3">
+                        <label asp-for="Price" class="form-label"></label>
+                        <div class="input-group">
+                            <span class="input-group-text">@c.Symbol</span>
+                            <input asp-for="Price" class="form-control" type="number" step="@step" min="0"
+                                   id="priceInput" disabled="@(!Model.CanChangePrice)" />
+                        </div>
+                        <span asp-validation-for="Price" class="text-danger"></span>
+                        @if (!Model.CanChangePrice)
+                        {
+                            <div class="form-hint text-danger">
+                                No tiene el permiso «Cambiar precios». El precio se mantendrá sin cambios.
+                            </div>
+                        }
+                    </div>
+
+                    @if (isEdit && Model.CanChangePrice)
+                    {
+                        <div class="mb-3" id="reasonBlock" style="display:none">
+                            <label asp-for="PriceChangeReason" class="form-label"></label>
+                            <input asp-for="PriceChangeReason" class="form-control"
+                                   placeholder="Ej. aumento del proveedor" />
+                            <div class="form-hint">
+                                Se guardará junto con la fecha, la hora y su usuario.
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label asp-for="Cost" class="form-label"></label>
+                        <div class="input-group">
+                            <span class="input-group-text">@c.Symbol</span>
+                            <input asp-for="Cost" class="form-control" type="number" step="@step" min="0" />
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label asp-for="Stock" class="form-label"></label>
+                            <input asp-for="Stock" class="form-control" type="number" step="0.001" />
+                        </div>
+                        <div class="col-6">
+                            <label asp-for="MinStock" class="form-label"></label>
+                            <input asp-for="MinStock" class="form-control" type="number" step="0.001" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--info)"><use href="#i-image"></use></svg>
+                    <h2 class="card-x__title">Imagen (opcional)</h2>
+                </div>
+                <div class="card-x__body">
+                    @if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+                    {
+                        <img src="@Model.ImagePath" alt="@Model.Name" class="mb-2"
+                             style="width:100%;max-height:170px;object-fit:contain;border-radius:var(--radius-sm);border:1px solid var(--line)" />
+                        <div class="form-check mb-2">
+                            <input asp-for="RemoveImage" class="form-check-input" />
+                            <label asp-for="RemoveImage" class="form-check-label fs-13"></label>
+                        </div>
+                    }
+                    <input asp-for="ImageFile" class="form-control" type="file" accept="image/*" />
+                    <div class="form-hint">JPG, PNG, WEBP o GIF. Máximo 3&nbsp;MB.</div>
+                    <span asp-validation-for="ImageFile" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="card-x mb-3">
+                <div class="card-x__body">
+                    <div class="form-check mb-2">
+                        <input asp-for="IsProduced" class="form-check-input" />
+                        <label asp-for="IsProduced" class="form-check-label fs-13"></label>
+                        <div class="form-hint">Aparecerá en el pedido a la planta de producción.</div>
+                    </div>
+                    <div class="form-check">
+                        <input asp-for="IsActive" class="form-check-input" />
+                        <label asp-for="IsActive" class="form-check-label fs-13"></label>
+                    </div>
+                </div>
+                <div class="card-x__foot d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">
+                        <svg class="icon"><use href="#i-save"></use></svg> Guardar
+                    </button>
+                    <a class="btn btn-soft" asp-action="Index">Cancelar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Pide el motivo sólo cuando efectivamente cambió el precio.
+        (function () {
+            var price = document.getElementById('priceInput');
+            var block = document.getElementById('reasonBlock');
+            if (!price || !block) { return; }
+            var original = parseFloat(document.querySelector('[name="OriginalPrice"]').value || '0');
+            function check() {
+                var now = parseFloat(price.value || '0');
+                block.style.display = (now !== original) ? '' : 'none';
+            }
+            price.addEventListener('input', check);
+            check();
+        })();
+    </script>
+}

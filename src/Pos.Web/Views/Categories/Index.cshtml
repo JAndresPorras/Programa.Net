@@ -1,0 +1,79 @@
+@model List<Category>
+
+<div class="page-head">
+    <div>
+        <h1>Categorías</h1>
+        <p>Agrupan los productos del maestro y se usan en los reportes de ventas por categoría.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-primary" asp-action="Create">
+            <svg class="icon"><use href="#i-plus"></use></svg> Nueva categoría
+        </a>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x__head">
+        <svg class="icon" style="color:var(--primary)"><use href="#i-tag"></use></svg>
+        <h2 class="card-x__title">Listado</h2>
+        <span class="chip ms-auto">@Model.Count categorías</span>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <svg class="icon"><use href="#i-tag"></use></svg>
+            <p>Todavía no hay categorías. Cree la primera para organizar el catálogo.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-x">
+                <thead>
+                <tr>
+                    <th style="width:60px">Color</th>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th class="t-center">Productos</th>
+                    <th class="t-center">Estado</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var c in Model)
+                {
+                    <tr>
+                        <td><span class="cat-dot" style="width:22px;height:22px;background:@c.Color"></span></td>
+                        <td><b>@c.Name</b></td>
+                        <td class="text-soft fs-13">@(c.Description ?? "—")</td>
+                        <td class="t-center num">@c.Products.Count</td>
+                        <td class="t-center">
+                            @if (c.IsActive)
+                            {
+                                <span class="chip chip--success chip--dot">Activa</span>
+                            }
+                            else
+                            {
+                                <span class="chip chip--danger chip--dot">Inactiva</span>
+                            }
+                        </td>
+                        <td class="t-right">
+                            <a class="btn btn-soft btn-sm" asp-action="Edit" asp-route-id="@c.Id">
+                                <svg class="icon"><use href="#i-edit"></use></svg>
+                            </a>
+                            <form asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline"
+                                  data-confirm="¿Eliminar la categoría @c.Name?">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-soft btn-sm text-danger">
+                                    <svg class="icon"><use href="#i-trash"></use></svg>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

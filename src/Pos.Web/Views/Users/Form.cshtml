@@ -1,0 +1,163 @@
+@model UserFormViewModel
+@{
+    var isEdit = Model.Id > 0;
+}
+
+<div class="page-head">
+    <div>
+        <h1>@(isEdit ? "Editar usuario" : "Nuevo usuario")</h1>
+        <p>El rol otorga los permisos base. Abajo puede sumarle permisos adicionales a esta persona.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="Index">
+            <svg class="icon"><use href="#i-back"></use></svg> Volver
+        </a>
+    </div>
+</div>
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--primary)"><use href="#i-user"></use></svg>
+                    <h2 class="card-x__title">Datos de la persona</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="mb-3">
+                        <label asp-for="FullName" class="form-label"></label>
+                        <input asp-for="FullName" class="form-control" placeholder="Ej. María Pérez" data-autofocus />
+                        <span asp-validation-for="FullName" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="UserName" class="form-label"></label>
+                        <input asp-for="UserName" class="form-control num" placeholder="Ej. mperez"
+                               readonly="@isEdit" />
+                        <div class="form-hint">Es el nombre con el que ingresa. No se puede cambiar después.</div>
+                        <span asp-validation-for="UserName" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" type="email" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="DocumentId" class="form-label"></label>
+                        <input asp-for="DocumentId" class="form-control num" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Role" class="form-label"></label>
+                        <select asp-for="Role" class="form-select" id="roleSelect">
+                            @foreach (var role in Model.AvailableRoles)
+                            {
+                                <option value="@role" selected="@(Model.Role == role)">@role</option>
+                            }
+                        </select>
+                        <div class="form-hint">
+                            Al cambiar el rol se aplican sus permisos base. Guarde para verlos reflejados.
+                        </div>
+                        <span asp-validation-for="Role" class="text-danger"></span>
+                    </div>
+                    <div class="form-check">
+                        <input asp-for="IsActive" class="form-check-input" disabled="@Model.IsCurrentUser" />
+                        <label asp-for="IsActive" class="form-check-label"></label>
+                        @if (Model.IsCurrentUser)
+                        {
+                            <div class="form-hint">No puede desactivar su propio usuario.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-x">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--warning)"><use href="#i-key"></use></svg>
+                    <h2 class="card-x__title">@(isEdit ? "Cambiar contraseña" : "Contraseña inicial")</h2>
+                </div>
+                <div class="card-x__body">
+                    @if (isEdit)
+                    {
+                        <p class="fs-12 text-soft">Déjelo en blanco para conservar la contraseña actual.</p>
+                    }
+                    <div class="mb-3">
+                        <label asp-for="Password" class="form-label"></label>
+                        <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                        <div class="form-hint">Mínimo 6 caracteres e incluir al menos un número.</div>
+                        <span asp-validation-for="Password" class="text-danger"></span>
+                    </div>
+                    <div>
+                        <label asp-for="ConfirmPassword" class="form-label"></label>
+                        <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="card-x__foot d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">
+                        <svg class="icon"><use href="#i-save"></use></svg> Guardar usuario
+                    </button>
+                    <a class="btn btn-soft" asp-action="Index">Cancelar</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card-x">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--success)"><use href="#i-shield"></use></svg>
+                    <h2 class="card-x__title">Permisos de este usuario</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="alert alert-info mb-3">
+                        <svg class="icon"><use href="#i-info"></use></svg>
+                        <div class="fs-12">
+                            Los permisos marcados como <b>del rol</b> vienen del rol seleccionado y se
+                            administran en <a asp-action="RolesPermissions">Permisos por rol</a>.
+                            Aquí puede otorgar permisos adicionales solo a esta persona.
+                        </div>
+                    </div>
+
+                    @foreach (var group in Permissions.Grouped)
+                    {
+                        <div class="mb-3">
+                            <div class="fs-11 text-uppercase fw-bold text-muted-x mb-2"
+                                 style="letter-spacing:.06em">@group.Key</div>
+                            <div class="row g-2">
+                                @foreach (var permission in group)
+                                {
+                                    var fromRole = Model.RolePermissions.Contains(permission.Value);
+                                    var granted = fromRole || Model.ExtraPermissions.Contains(permission.Value);
+                                    <div class="col-md-6">
+                                        <div class="form-check" style="padding:8px 10px 8px 32px;border:1px solid var(--line);border-radius:var(--radius-sm)">
+                                            <input class="form-check-input" type="checkbox"
+                                                   name="ExtraPermissions" value="@permission.Value"
+                                                   id="perm_@permission.Value.Replace('.', '_')"
+                                                   checked="@granted" disabled="@fromRole" />
+                                            <label class="form-check-label" for="perm_@permission.Value.Replace('.', '_')">
+                                                <b class="fs-13">@permission.Name</b>
+                                                @if (fromRole)
+                                                {
+                                                    <span class="chip chip--primary ms-1" style="font-size:10px">del rol</span>
+                                                }
+                                                <div class="fs-11 text-muted-x">@permission.Description</div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

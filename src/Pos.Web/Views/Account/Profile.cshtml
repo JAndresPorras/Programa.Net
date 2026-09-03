@@ -1,0 +1,113 @@
+@model ProfileViewModel
+
+<div class="page-head">
+    <div>
+        <h1>Mi perfil</h1>
+        <p>Sus datos y los permisos con los que ingresó al sistema.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="ChangePassword">
+            <svg class="icon"><use href="#i-key"></use></svg> Cambiar contraseña
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card-x">
+            <div class="card-x__body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <span class="avatar avatar--lg">@(Model.FullName.Length > 0 ? Model.FullName[..1].ToUpper() : "?")</span>
+                    <div>
+                        <b style="font-size:16px">@Model.FullName</b>
+                        <div class="fs-12 text-muted-x num">@Model.UserName</div>
+                        <span class="chip chip--primary mt-1">@Model.Role</span>
+                    </div>
+                </div>
+                <div class="divider"></div>
+
+                <form asp-action="Profile" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+                         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="FullName" class="form-label"></label>
+                        <input asp-for="FullName" class="form-control" />
+                        <span asp-validation-for="FullName" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" type="email" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="DocumentId" class="form-label"></label>
+                        <input asp-for="DocumentId" class="form-control num" />
+                    </div>
+
+                    <div class="divider"></div>
+                    <div class="row fs-12 text-soft mb-3">
+                        <div class="col-6">
+                            Creado el<br /><b class="num">@Model.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</b>
+                        </div>
+                        <div class="col-6">
+                            Último ingreso<br />
+                            <b class="num">@(Model.LastLoginAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—")</b>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <svg class="icon"><use href="#i-save"></use></svg> Guardar cambios
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card-x">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--success)"><use href="#i-shield"></use></svg>
+                <h2 class="card-x__title">Lo que puede hacer en el sistema</h2>
+            </div>
+            <div class="card-x__body">
+                @if (Model.Role == Roles.Admin)
+                {
+                    <div class="alert alert-success mb-3">
+                        <svg class="icon"><use href="#i-check-circle"></use></svg>
+                        <div>Como administrador tiene acceso a todas las funciones del sistema.</div>
+                    </div>
+                }
+
+                @foreach (var group in Permissions.Grouped)
+                {
+                    <div class="fs-11 text-uppercase fw-bold text-muted-x mb-2 mt-3"
+                         style="letter-spacing:.06em">@group.Key</div>
+                    <div class="row g-2">
+                        @foreach (var permission in group)
+                        {
+                            var granted = Model.Role == Roles.Admin || Model.Permissions.Contains(permission.Value);
+                            <div class="col-md-6">
+                                <div class="d-flex gap-2 align-items-start fs-13"
+                                     style="opacity:@(granted ? "1" : ".42")">
+                                    <svg class="icon" style="color:@(granted ? "var(--success)" : "var(--ink-muted)");margin-top:2px">
+                                        <use href="@(granted ? "#i-check-circle" : "#i-x")"></use>
+                                    </svg>
+                                    <span>
+                                        @permission.Name
+                                        <div class="fs-11 text-muted-x">@permission.Description</div>
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

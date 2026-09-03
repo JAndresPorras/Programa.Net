@@ -1,0 +1,47 @@
+@model Sale
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Anular recibo @Model.Number</h1>
+        <p>La venta quedará marcada como anulada y no se contará en los reportes ni en la entrega de caja.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card-x">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--danger)"><use href="#i-alert"></use></svg>
+                <h2 class="card-x__title">Confirmar anulación</h2>
+            </div>
+            <div class="card-x__body">
+                <div class="alert alert-warning mb-3">
+                    <svg class="icon"><use href="#i-alert"></use></svg>
+                    <div>
+                        Va a anular una venta de <b>@c.Format(Model.Total)</b> con
+                        @Model.Items.Count artículos, emitida el
+                        @Model.SoldAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm").
+                    </div>
+                </div>
+
+                <form asp-action="Cancel" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <label class="form-label" for="reason">Motivo de la anulación</label>
+                    <textarea class="form-control" id="reason" name="reason" rows="3" required
+                              placeholder="Ej. el cliente devolvió el producto"></textarea>
+                    <div class="d-flex gap-2 mt-3">
+                        <a class="btn btn-soft" asp-action="Details" asp-route-id="@Model.Id">Cancelar</a>
+                        <button type="submit" class="btn btn-danger"
+                                data-confirm="¿Confirma la anulación de este recibo?">
+                            <svg class="icon"><use href="#i-x"></use></svg> Anular recibo
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

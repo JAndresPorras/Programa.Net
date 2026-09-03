@@ -1,0 +1,291 @@
+@model PosSettings
+@{
+    var currencies = (IReadOnlyList<CurrencyInfo>)ViewBag.Currencies;
+    var current = Model.Currency;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Configuración del sistema</h1>
+        <p>Solo el administrador puede cambiar estos valores. Afectan a todas las cajas.</p>
+    </div>
+</div>
+
+<form asp-action="Index" method="post">
+    @Html.AntiForgeryToken()
+
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="row g-3">
+        <!-- ------------------------------------------------------- Moneda -->
+        <div class="col-lg-6">
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--success)"><use href="#i-coins"></use></svg>
+                    <h2 class="card-x__title">Moneda del punto de venta</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="row g-2">
+                        @foreach (var currency in currencies)
+                        {
+                            var active = currency.Code == Model.CurrencyCode;
+                            <div class="col-md-4">
+                                <label class="pay-method w-100 @(active ? "is-active" : "")"
+                                       style="flex-direction:column;padding:14px 8px;cursor:pointer">
+                                    <input type="radio" asp-for="CurrencyCode" value="@currency.Code"
+                                           class="d-none currency-radio" checked="@active" />
+                                    <b style="font-size:22px;font-family:var(--font-num)">@currency.Symbol</b>
+                                    <span style="font-size:12.5px">@currency.Code</span>
+                                    <span class="fs-11 text-muted-x">@currency.Name</span>
+                                </label>
+                            </div>
+                        }
+                    </div>
+                    <span asp-validation-for="CurrencyCode" class="text-danger"></span>
+
+                    <div class="alert alert-info mt-3 mb-0">
+                        <svg class="icon"><use href="#i-info"></use></svg>
+                        <div>
+                            Moneda actual: <b>@current.Name</b>. Ejemplo de importe:
+                            <b class="money">@current.Format(1234.5m)</b> &middot;
+                            @current.Decimals decimales &middot; vuelto redondeado a
+                            <b>@current.Format(current.CashRounding)</b>.
+                            <br />
+                            Las ventas ya cerradas conservan la moneda con la que se cobraron.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- --------------------------------------------- Datos del negocio -->
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--primary)"><use href="#i-store"></use></svg>
+                    <h2 class="card-x__title">Datos del negocio</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label asp-for="BusinessName" class="form-label">Nombre del negocio</label>
+                            <input asp-for="BusinessName" class="form-control" />
+                        </div>
+                        <div class="col-md-5">
+                            <label asp-for="BusinessDocument" class="form-label">RUC / NIT</label>
+                            <input asp-for="BusinessDocument" class="form-control num" />
+                        </div>
+                        <div class="col-md-7">
+                            <label asp-for="BusinessAddress" class="form-label">Dirección</label>
+                            <input asp-for="BusinessAddress" class="form-control" />
+                        </div>
+                        <div class="col-md-5">
+                            <label asp-for="BusinessPhone" class="form-label">Teléfono</label>
+                            <input asp-for="BusinessPhone" class="form-control num" />
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="BusinessFooter" class="form-label">Mensaje al pie del recibo</label>
+                            <input asp-for="BusinessFooter" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------------------------------------------------- Impuesto -->
+            <div class="card-x">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--warning)"><use href="#i-file"></use></svg>
+                    <h2 class="card-x__title">Impuesto</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="form-check mb-3">
+                        <input asp-for="TaxEnabled" class="form-check-input" />
+                        <label asp-for="TaxEnabled" class="form-check-label">Desglosar impuesto en el recibo</label>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label asp-for="TaxName" class="form-label">Nombre</label>
+                            <input asp-for="TaxName" class="form-control" placeholder="IGV / IVA" />
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="TaxRate" class="form-label">Porcentaje</label>
+                            <div class="input-group">
+                                <input asp-for="TaxRate" class="form-control" type="number" step="0.01" min="0" max="100" />
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <span asp-validation-for="TaxRate" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input asp-for="TaxIncluded" class="form-check-input" />
+                                <label asp-for="TaxIncluded" class="form-check-label fs-13">
+                                    El precio ya lo incluye
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ---------------------------------------------------- Impresora -->
+        <div class="col-lg-6">
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--info)"><use href="#i-print"></use></svg>
+                    <h2 class="card-x__title">Impresora de recibos (80 mm)</h2>
+                </div>
+                <div class="card-x__body">
+                    <label class="form-label">Modo de impresión</label>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="pay-method w-100 @(Model.PrinterMode == "browser" ? "is-active" : "")"
+                                   style="flex-direction:column;padding:12px 8px;cursor:pointer">
+                                <input type="radio" asp-for="PrinterMode" value="browser" class="d-none printer-radio"
+                                       checked="@(Model.PrinterMode == "browser")" />
+                                <b>Por el navegador</b>
+                                <span class="fs-11 text-muted-x text-center">Impresora USB instalada en la caja</span>
+                            </label>
+                        </div>
+                        <div class="col-6">
+                            <label class="pay-method w-100 @(Model.PrinterMode == "network" ? "is-active" : "")"
+                                   style="flex-direction:column;padding:12px 8px;cursor:pointer">
+                                <input type="radio" asp-for="PrinterMode" value="network" class="d-none printer-radio"
+                                       checked="@(Model.PrinterMode == "network")" />
+                                <b>Directo por red</b>
+                                <span class="fs-11 text-muted-x text-center">ESC/POS al puerto 9100</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label asp-for="PrinterHost" class="form-label">Dirección IP de la impresora</label>
+                            <input asp-for="PrinterHost" class="form-control num" placeholder="192.168.1.100" />
+                        </div>
+                        <div class="col-md-5">
+                            <label asp-for="PrinterPort" class="form-label">Puerto</label>
+                            <input asp-for="PrinterPort" class="form-control num" type="number" min="1" max="65535" />
+                            <span asp-validation-for="PrinterPort" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="PrinterCharsPerLine" class="form-label">Caracteres por línea</label>
+                            <input asp-for="PrinterCharsPerLine" class="form-control num" type="number" min="32" max="56" />
+                            <div class="form-hint">48 para papel de 80 mm, 32 para 58 mm.</div>
+                            <span asp-validation-for="PrinterCharsPerLine" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="ReceiptCopies" class="form-label">Copias del recibo</label>
+                            <input asp-for="ReceiptCopies" class="form-control num" type="number" min="1" max="3" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="ReceiptSeries" class="form-label">Serie del recibo</label>
+                            <input asp-for="ReceiptSeries" class="form-control num" placeholder="B001" />
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input asp-for="ReceiptPrintAuto" class="form-check-input" />
+                                <label asp-for="ReceiptPrintAuto" class="form-check-label fs-13">
+                                    Imprimir al cerrar la venta
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input asp-for="PrinterCutPaper" class="form-check-input" />
+                                <label asp-for="PrinterCutPaper" class="form-check-label fs-13">Cortar el papel</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input asp-for="PrinterOpenDrawer" class="form-check-input" />
+                                <label asp-for="PrinterOpenDrawer" class="form-check-label fs-13">
+                                    Abrir el cajón de dinero
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mt-3 mb-0">
+                        <svg class="icon"><use href="#i-info"></use></svg>
+                        <div class="fs-12">
+                            Con la 3nStar RPT004 conectada por USB al equipo de la caja, deje el modo
+                            <b>por el navegador</b>: el recibo sale con el formato de 80&nbsp;mm ya listo.
+                            Si la conecta por red, use el modo <b>directo</b> con su IP.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ------------------------------------------------ Punto de venta -->
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--primary)"><use href="#i-scan"></use></svg>
+                    <h2 class="card-x__title">Punto de venta</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="PosDefaultOpeningFloat" class="form-label">Fondo de caja sugerido</label>
+                            <div class="input-group">
+                                <span class="input-group-text">@current.Symbol</span>
+                                <input asp-for="PosDefaultOpeningFloat" class="form-control" type="number" min="0"
+                                       step="@(current.Decimals == 0 ? "1" : "0.01")" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="TimeZone" class="form-label">Zona horaria</label>
+                            <input asp-for="TimeZone" class="form-control" placeholder="America/Lima" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input asp-for="PosStockControl" class="form-check-input" />
+                                <label asp-for="PosStockControl" class="form-check-label">
+                                    Controlar el stock al vender
+                                </label>
+                                <div class="form-hint">
+                                    Si se activa, el sistema descuenta el stock y no deja vender sin existencias.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-x__foot d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-primary">
+                        <svg class="icon"><use href="#i-save"></use></svg> Guardar configuración
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="d-flex gap-2 flex-wrap">
+    <form asp-action="TestPrinter" method="post">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-soft">
+            <svg class="icon"><use href="#i-print"></use></svg> Probar impresora de red
+        </button>
+    </form>
+    <form asp-action="OpenDrawer" method="post">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-soft">
+            <svg class="icon"><use href="#i-cash"></use></svg> Abrir cajón de dinero
+        </button>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Resalta la tarjeta seleccionada de moneda y de modo de impresión.
+        ['currency-radio', 'printer-radio'].forEach(function (group) {
+            document.querySelectorAll('.' + group).forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    document.querySelectorAll('.' + group).forEach(function (other) {
+                        other.closest('.pay-method').classList.toggle('is-active', other.checked);
+                    });
+                });
+            });
+        });
+    </script>
+}

@@ -1,0 +1,95 @@
+@model List<AuditLog>
+@{
+    var from = (DateTime)ViewBag.From;
+    var to = (DateTime)ViewBag.To;
+    var currentPage = (int)ViewBag.Page;
+    var totalPages = (int)ViewBag.TotalPages;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Bitácora del sistema</h1>
+        <p>Registro de quién hizo qué y cuándo: ingresos, ventas, anulaciones, cambios de precio y de caja.</p>
+    </div>
+    <form method="get" class="page-head__actions">
+        <input type="date" name="from" class="form-control" style="width:auto" value="@from.ToString("yyyy-MM-dd")" />
+        <input type="date" name="to" class="form-control" style="width:auto" value="@to.ToString("yyyy-MM-dd")" />
+        <select name="accion" class="form-select" style="width:auto">
+            <option value="">Todas las acciones</option>
+            @foreach (var a in (List<string>)ViewBag.Actions)
+            {
+                <option value="@a" selected="@(ViewBag.Action as string == a)">@a</option>
+            }
+        </select>
+        <button type="submit" class="btn btn-primary">
+            <svg class="icon"><use href="#i-search"></use></svg> Filtrar
+        </button>
+    </form>
+</div>
+
+<div class="card-x">
+    <div class="card-x__head">
+        <svg class="icon" style="color:var(--warning)"><use href="#i-history"></use></svg>
+        <h2 class="card-x__title">Movimientos registrados</h2>
+        <span class="chip ms-auto">@ViewBag.Total registros</span>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <svg class="icon"><use href="#i-history"></use></svg>
+            <p>No hay registros en el período seleccionado.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-x">
+                <thead>
+                <tr>
+                    <th>Fecha y hora</th>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                    <th>Entidad</th>
+                    <th>Detalle</th>
+                    <th>Origen</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var log in Model)
+                {
+                    <tr>
+                        <td class="num fs-12">@log.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
+                        <td>@log.UserName</td>
+                        <td><span class="chip">@log.Action</span></td>
+                        <td class="fs-13">@log.Entity @(string.IsNullOrEmpty(log.EntityId) ? "" : $"#{log.EntityId}")</td>
+                        <td class="fs-12 text-soft">@log.Details</td>
+                        <td class="fs-11 text-muted-x num">@log.IpAddress</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <div class="card-x__foot d-flex justify-content-between align-items-center">
+                <span class="fs-12 text-muted-x">Página @currentPage de @totalPages</span>
+                <div class="d-flex gap-2">
+                    @if (currentPage > 1)
+                    {
+                        <a class="btn btn-soft btn-sm" asp-action="Audit" asp-route-page="@(currentPage - 1)"
+                           asp-route-from="@from.ToString("yyyy-MM-dd")" asp-route-to="@to.ToString("yyyy-MM-dd")"
+                           asp-route-accion="@ViewBag.Action">Anterior</a>
+                    }
+                    @if (currentPage < totalPages)
+                    {
+                        <a class="btn btn-soft btn-sm" asp-action="Audit" asp-route-page="@(currentPage + 1)"
+                           asp-route-from="@from.ToString("yyyy-MM-dd")" asp-route-to="@to.ToString("yyyy-MM-dd")"
+                           asp-route-accion="@ViewBag.Action">Siguiente</a>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>

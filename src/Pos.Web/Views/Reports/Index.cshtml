@@ -1,0 +1,265 @@
+@model SalesReport
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var from = (DateTime)ViewBag.From;
+    var to = (DateTime)ViewBag.To;
+    var maxDay = Model.ByDay.Count > 0 ? Model.ByDay.Max(d => d.Amount) : 0;
+    var maxHour = Model.ByHour.Count > 0 ? Model.ByHour.Max(h => h.Amount) : 0;
+}
+
+<div class="page-head no-print">
+    <div>
+        <h1>Reporte de ventas</h1>
+        <p>Consulte las ventas por día, cajera, categoría y hora. Se puede abrir desde internet.</p>
+    </div>
+    <div class="page-head__actions">
+        @if (User.HasPermission(Permissions.ReportsExport))
+        {
+            <a class="btn btn-soft" asp-action="ExportSales" asp-route-from="@from.ToString("yyyy-MM-dd")"
+               asp-route-to="@to.ToString("yyyy-MM-dd")" asp-route-userId="@ViewBag.UserId"
+               asp-route-categoryId="@ViewBag.CategoryId">
+                <svg class="icon"><use href="#i-download"></use></svg> Exportar CSV
+            </a>
+        }
+        <button type="button" class="btn btn-soft" onclick="window.print()">
+            <svg class="icon"><use href="#i-print"></use></svg> Imprimir
+        </button>
+    </div>
+</div>
+
+<div class="card-x mb-3 no-print">
+    <div class="card-x__body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="from">Desde</label>
+                <input type="date" class="form-control" id="from" name="from" value="@from.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="to">Hasta</label>
+                <input type="date" class="form-control" id="to" name="to" value="@to.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="userId">Cajera</label>
+                <select class="form-select" id="userId" name="userId"
+                        asp-items="@((List<SelectListItem>)ViewBag.Users)">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="categoryId">Categoría</label>
+                <select class="form-select" id="categoryId" name="categoryId"
+                        asp-items="@((List<SelectListItem>)ViewBag.Categories)">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <svg class="icon"><use href="#i-search"></use></svg> Consultar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--success">
+            <div class="stat__label">Total vendido</div>
+            <div class="stat__value">@c.Format(Model.Total)</div>
+            <div class="stat__hint">@Model.SalesCount recibos cerrados</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat">
+            <div class="stat__label">Ticket promedio</div>
+            <div class="stat__value">@c.Format(Model.AverageTicket)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--info">
+            <div class="stat__label">Unidades vendidas</div>
+            <div class="stat__value">@EscPosPrinter.FormatQuantity(Model.UnitsSold)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--danger">
+            <div class="stat__label">Anulados</div>
+            <div class="stat__value">@Model.CancelledCount</div>
+            <div class="stat__hint">@c.Format(Model.CancelledTotal)</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card-x mb-3">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--primary)"><use href="#i-box"></use></svg>
+                <h2 class="card-x__title">Productos más vendidos</h2>
+            </div>
+            @if (Model.TopProducts.Count == 0)
+            {
+                <div class="empty"><svg class="icon"><use href="#i-chart"></use></svg>
+                    <p>No hay ventas en el período seleccionado.</p></div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table-x">
+                        <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Categoría</th>
+                            <th class="t-center">Cantidad</th>
+                            <th class="t-right">Importe</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.TopProducts)
+                        {
+                            <tr>
+                                <td><b>@row.Name</b><div class="fs-11 text-muted-x num">@row.Code</div></td>
+                                <td class="fs-13">@row.CategoryName</td>
+                                <td class="t-center num">@EscPosPrinter.FormatQuantity(row.Quantity) @row.Unit</td>
+                                <td class="t-right money"><b>@c.Format(row.Total)</b></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="card-x">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--info)"><use href="#i-clock"></use></svg>
+                <h2 class="card-x__title">Ventas por hora</h2>
+            </div>
+            <div class="card-x__body">
+                @if (Model.ByHour.Count == 0)
+                {
+                    <p class="text-muted-x mb-0 fs-13">Sin datos para graficar.</p>
+                }
+                else
+                {
+                    foreach (var hour in Model.ByHour)
+                    {
+                        var pct = maxHour == 0 ? 0 : (double)(hour.Amount / maxHour) * 100;
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="num fs-12" style="width:46px">@hour.Label</span>
+                            <div style="flex:1;height:16px;background:var(--canvas);border-radius:4px;overflow:hidden">
+                                <div style="width:@pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;height:100%;background:var(--primary)"></div>
+                            </div>
+                            <span class="money fs-12" style="width:100px;text-align:right">@c.Format(hour.Amount)</span>
+                            <span class="fs-11 text-muted-x" style="width:60px">@hour.Count rec.</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card-x mb-3">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--warning)"><use href="#i-tag"></use></svg>
+                <h2 class="card-x__title">Por categoría</h2>
+            </div>
+            <div class="table-wrap">
+                <table class="table-x">
+                    <thead><tr><th>Categoría</th><th class="t-center">Unid.</th><th class="t-right">Importe</th></tr></thead>
+                    <tbody>
+                    @foreach (var row in Model.ByCategory)
+                    {
+                        <tr>
+                            <td>@row.Label</td>
+                            <td class="t-center num">@EscPosPrinter.FormatQuantity(row.Units)</td>
+                            <td class="t-right money"><b>@c.Format(row.Amount)</b></td>
+                        </tr>
+                    }
+                    @if (Model.ByCategory.Count == 0)
+                    {
+                        <tr><td colspan="3" class="text-center text-muted-x py-3">Sin datos</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card-x mb-3">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--success)"><use href="#i-users"></use></svg>
+                <h2 class="card-x__title">Por cajera</h2>
+            </div>
+            <div class="table-wrap">
+                <table class="table-x">
+                    <thead><tr><th>Cajera</th><th class="t-center">Recibos</th><th class="t-right">Importe</th></tr></thead>
+                    <tbody>
+                    @foreach (var row in Model.ByUser)
+                    {
+                        <tr>
+                            <td>@row.Label</td>
+                            <td class="t-center num">@row.Count</td>
+                            <td class="t-right money"><b>@c.Format(row.Amount)</b></td>
+                        </tr>
+                    }
+                    @if (Model.ByUser.Count == 0)
+                    {
+                        <tr><td colspan="3" class="text-center text-muted-x py-3">Sin datos</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card-x mb-3">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--primary)"><use href="#i-cash"></use></svg>
+                <h2 class="card-x__title">Por forma de pago</h2>
+            </div>
+            <div class="table-wrap">
+                <table class="table-x">
+                    <thead><tr><th>Medio</th><th class="t-center">Recibos</th><th class="t-right">Importe</th></tr></thead>
+                    <tbody>
+                    @foreach (var row in Model.ByPaymentMethod)
+                    {
+                        <tr>
+                            <td>@row.Label</td>
+                            <td class="t-center num">@row.Count</td>
+                            <td class="t-right money"><b>@c.Format(row.Amount)</b></td>
+                        </tr>
+                    }
+                    @if (Model.ByPaymentMethod.Count == 0)
+                    {
+                        <tr><td colspan="3" class="text-center text-muted-x py-3">Sin datos</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (Model.ByDay.Count > 1)
+        {
+            <div class="card-x">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--info)"><use href="#i-calendar"></use></svg>
+                    <h2 class="card-x__title">Por día</h2>
+                </div>
+                <div class="card-x__body">
+                    @foreach (var day in Model.ByDay)
+                    {
+                        var pct = maxDay == 0 ? 0 : (double)(day.Amount / maxDay) * 100;
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="num fs-12" style="width:76px">@day.Label</span>
+                            <div style="flex:1;height:16px;background:var(--canvas);border-radius:4px;overflow:hidden">
+                                <div style="width:@pct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;height:100%;background:var(--success)"></div>
+                            </div>
+                            <span class="money fs-12" style="width:100px;text-align:right">@c.Format(day.Amount)</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,95 @@
+@model List<UserRowViewModel>
+
+<div class="page-head">
+    <div>
+        <h1>Usuarios y permisos</h1>
+        <p>Defina quién entra al sistema y exactamente qué puede hacer cada persona.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="RolesPermissions">
+            <svg class="icon"><use href="#i-shield"></use></svg> Permisos por rol
+        </a>
+        <a class="btn btn-primary" asp-action="Create">
+            <svg class="icon"><use href="#i-plus"></use></svg> Nuevo usuario
+        </a>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x__head">
+        <svg class="icon" style="color:var(--primary)"><use href="#i-users"></use></svg>
+        <h2 class="card-x__title">Usuarios del sistema</h2>
+        <span class="chip ms-auto">@Model.Count usuarios</span>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table-x">
+            <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Permisos extra</th>
+                <th>Último ingreso</th>
+                <th class="t-center">Estado</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var u in Model)
+            {
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="avatar">@(u.FullName.Length > 0 ? u.FullName[..1].ToUpper() : "?")</span>
+                            <span>
+                                <b>@u.FullName</b>
+                                <div class="fs-11 text-muted-x num">@u.UserName @(string.IsNullOrWhiteSpace(u.Email) ? "" : "· " + u.Email)</div>
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="chip @(u.Role == Roles.Admin ? "chip--primary" : u.Role == Roles.Supervisor ? "chip--info" : "")">
+                            @u.Role
+                        </span>
+                    </td>
+                    <td class="num">
+                        @if (u.ExtraPermissions > 0)
+                        {
+                            <span class="chip chip--warning">+@u.ExtraPermissions</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted-x fs-12">—</span>
+                        }
+                    </td>
+                    <td class="num fs-12">
+                        @(u.LastLoginAt.HasValue ? u.LastLoginAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Nunca")
+                    </td>
+                    <td class="t-center">
+                        @if (u.IsActive)
+                        {
+                            <span class="chip chip--success chip--dot">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="chip chip--danger chip--dot">Inactivo</span>
+                        }
+                    </td>
+                    <td class="t-right">
+                        <a class="btn btn-soft btn-sm" asp-action="Edit" asp-route-id="@u.Id">
+                            <svg class="icon"><use href="#i-edit"></use></svg>
+                        </a>
+                        <form asp-action="ToggleActive" asp-route-id="@u.Id" method="post" class="d-inline"
+                              data-confirm="@(u.IsActive ? $"¿Desactivar a {u.FullName}? No podrá ingresar." : $"¿Activar a {u.FullName}?")">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-soft btn-sm">
+                                <svg class="icon"><use href="@(u.IsActive ? "#i-x" : "#i-check")"></use></svg>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

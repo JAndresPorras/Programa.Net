@@ -1,0 +1,27 @@
+# Compilación de .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Base de datos local de SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Imágenes de productos subidas desde la aplicación
+src/Pos.Web/wwwroot/uploads/products/*
+!src/Pos.Web/wwwroot/uploads/products/.gitkeep
+
+# Configuración local con datos sensibles
+appsettings.Local.json
+*.pfx
+
+# Editores
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store

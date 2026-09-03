@@ -1,0 +1,205 @@
+@inject ISettingsService SettingsService
+@{
+    var settings = SettingsService.Current;
+    var currency = settings.Currency;
+    var route = (ViewContext.RouteData.Values["controller"]?.ToString() ?? "").ToLowerInvariant();
+    var routeAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? "").ToLowerInvariant();
+
+    // Marca el menú activo. Si se indican acciones, además debe coincidir una de ellas.
+    string Active(string controller, params string[] actions) =>
+        route == controller && (actions.Length == 0 || actions.Contains(routeAction)) ? "active" : "";
+
+    // Sección corta para la barra superior, para no repetir el título de la página.
+    var sectionLabel = route switch
+    {
+        "pos" => "Punto de venta",
+        "cash" => "Caja",
+        "sales" => "Ventas",
+        "products" or "categories" => "Catálogo",
+        "reports" => "Reportes",
+        "users" => "Administración",
+        "settings" => "Administración",
+        "account" => "Mi cuenta",
+        _ => "Punto de venta"
+    };
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] &middot; @settings.BusinessName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+@await Html.PartialAsync("_Icons")
+
+<div class="app">
+    <aside class="sidebar" id="sidebar">
+        <a class="sidebar__brand" asp-controller="Pos" asp-action="Index">
+            <span class="sidebar__logo"><svg class="icon"><use href="#i-store"></use></svg></span>
+            <span class="sidebar__brand-text">
+                <b>@settings.BusinessName</b>
+                <span>Punto de venta</span>
+            </span>
+        </a>
+
+        <nav class="sidebar__nav">
+            <div class="sidebar__section">Operación</div>
+            <a class="sidebar__link @Active("pos")" asp-controller="Pos" asp-action="Index">
+                <svg class="icon"><use href="#i-scan"></use></svg> Punto de venta
+            </a>
+            <a class="sidebar__link @Active("cash")" asp-controller="Cash" asp-action="Index">
+                <svg class="icon"><use href="#i-cash"></use></svg> Caja del día
+            </a>
+            <a class="sidebar__link @Active("sales")" asp-controller="Sales" asp-action="Index">
+                <svg class="icon"><use href="#i-receipt"></use></svg> Ventas del día
+            </a>
+
+            @if (User.HasAnyPermission(Permissions.ProductsView, Permissions.CategoriesManage))
+            {
+                <div class="sidebar__section">Catálogo</div>
+                @if (User.HasPermission(Permissions.ProductsView))
+                {
+                    <a class="sidebar__link @Active("products")" asp-controller="Products" asp-action="Index">
+                        <svg class="icon"><use href="#i-box"></use></svg> Códigos de barras
+                    </a>
+                }
+                @if (User.HasPermission(Permissions.CategoriesManage))
+                {
+                    <a class="sidebar__link @Active("categories")" asp-controller="Categories" asp-action="Index">
+                        <svg class="icon"><use href="#i-tag"></use></svg> Categorías
+                    </a>
+                }
+            }
+
+            @if (User.HasAnyPermission(Permissions.ReportsSales, Permissions.ReportsProduction))
+            {
+                <div class="sidebar__section">Reportes</div>
+                @if (User.HasPermission(Permissions.ReportsSales))
+                {
+                    <a class="sidebar__link @Active("reports", "index", "exportsales")" asp-controller="Reports" asp-action="Index">
+                        <svg class="icon"><use href="#i-chart"></use></svg> Reporte de ventas
+                    </a>
+                }
+                @if (User.HasPermission(Permissions.ReportsProduction))
+                {
+                    <a class="sidebar__link @Active("reports", "production", "exportproduction")" asp-controller="Reports" asp-action="Production">
+                        <svg class="icon"><use href="#i-factory"></use></svg> Pedido a producción
+                    </a>
+                }
+            }
+
+            @if (User.HasAnyPermission(Permissions.SettingsManage, Permissions.UsersManage, Permissions.AuditView))
+            {
+                <div class="sidebar__section">Administración</div>
+                @if (User.HasPermission(Permissions.UsersManage))
+                {
+                    <a class="sidebar__link @Active("users", "index", "create", "edit", "rolespermissions")" asp-controller="Users" asp-action="Index">
+                        <svg class="icon"><use href="#i-users"></use></svg> Usuarios y permisos
+                    </a>
+                }
+                @if (User.HasPermission(Permissions.SettingsManage))
+                {
+                    <a class="sidebar__link @Active("settings")" asp-controller="Settings" asp-action="Index">
+                        <svg class="icon"><use href="#i-gear"></use></svg> Configuración
+                    </a>
+                }
+                @if (User.HasPermission(Permissions.AuditView))
+                {
+                    <a class="sidebar__link @Active("users", "audit")" asp-controller="Users" asp-action="Audit">
+                        <svg class="icon"><use href="#i-history"></use></svg> Bitácora
+                    </a>
+                }
+            }
+        </nav>
+
+        <div class="sidebar__footer">
+            Moneda: <b>@currency.Code</b> (@currency.Symbol)
+        </div>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <button class="topbar__burger btn btn-sm" type="button" id="burger" aria-label="Menú">
+                <svg class="icon icon-lg"><use href="#i-menu"></use></svg>
+            </button>
+
+            <div>
+                <div class="topbar__section">@sectionLabel</div>
+                <div class="topbar__title">@(ViewData["Title"] ?? "Punto de venta")</div>
+            </div>
+
+            <div class="topbar__spacer"></div>
+
+            @if (User.HasPermission(Permissions.PosViewCollected))
+            {
+                @* El "ojito": la cajera presiona para ver cuánto lleva recolectado en el turno. *@
+                <div class="till" id="till" title="Dinero recolectado en el turno">
+                    <div>
+                        <div class="till__label">Recolectado</div>
+                        <div class="till__value is-hidden" id="tillValue">@currency.Symbol ••••</div>
+                    </div>
+                    <button type="button" class="till__eye" id="tillEye" aria-label="Mostrar u ocultar el recolectado">
+                        <svg class="icon" id="tillEyeIcon"><use href="#i-eye"></use></svg>
+                    </button>
+                </div>
+            }
+
+            <div class="dropdown">
+                <button class="user-chip dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="avatar">@(User.Identity?.Name?.Length > 0 ? User.Identity.Name[..1].ToUpper() : "?")</span>
+                    <span class="user-chip__text d-none d-md-block">
+                        <span class="user-chip__name">@User.GetDisplayName()</span>
+                        <span class="user-chip__role">@User.MainRole()</span>
+                    </span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow">
+                    <li><a class="dropdown-item" asp-controller="Account" asp-action="Profile">
+                        <svg class="icon me-1"><use href="#i-user"></use></svg> Mi perfil</a></li>
+                    <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">
+                        <svg class="icon me-1"><use href="#i-key"></use></svg> Cambiar contraseña</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form asp-controller="Account" asp-action="Logout" method="post">
+                            <button type="submit" class="dropdown-item text-danger">
+                                <svg class="icon me-1"><use href="#i-logout"></use></svg> Cerrar sesión
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </header>
+
+        <main class="content @(ViewData["ContentClass"])">
+            @if (TempData["Success"] is string okMessage)
+            {
+                <div class="alert alert-success alert-dismissible fade show no-print" role="alert">
+                    <svg class="icon"><use href="#i-check-circle"></use></svg>
+                    <div>@okMessage</div>
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+                </div>
+            }
+            @if (TempData["Error"] is string errorMessage)
+            {
+                <div class="alert alert-danger alert-dismissible fade show no-print" role="alert">
+                    <svg class="icon"><use href="#i-alert"></use></svg>
+                    <div>@errorMessage</div>
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+                </div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+</div>
+
+<div class="toast-host" id="toastHost"></div>
+
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

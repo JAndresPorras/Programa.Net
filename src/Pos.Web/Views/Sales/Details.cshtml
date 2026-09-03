@@ -1,0 +1,134 @@
+@model Sale
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var s = (PosSettings)ViewBag.Settings;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Recibo @Model.Number</h1>
+        <p>@Model.SoldAt.ToLocalTime().ToString("dddd dd/MM/yyyy HH:mm") &middot; Atendió @Model.UserName</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="Index">
+            <svg class="icon"><use href="#i-back"></use></svg> Volver
+        </a>
+        <a class="btn btn-primary" asp-action="Receipt" asp-route-id="@Model.Id" target="_blank">
+            <svg class="icon"><use href="#i-print"></use></svg> Imprimir recibo
+        </a>
+        @if (string.Equals(s.PrinterMode, "network", StringComparison.OrdinalIgnoreCase))
+        {
+            <form asp-action="PrintNetwork" asp-route-id="@Model.Id" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-soft">
+                    <svg class="icon"><use href="#i-print"></use></svg> Enviar a impresora de red
+                </button>
+            </form>
+        }
+        @if (Model.Status == SaleStatus.Completed && User.HasPermission(Permissions.PosCancelSale))
+        {
+            <a class="btn btn-soft text-danger" asp-action="Cancel" asp-route-id="@Model.Id">
+                <svg class="icon"><use href="#i-x"></use></svg> Anular
+            </a>
+        }
+    </div>
+</div>
+
+@if (Model.Status == SaleStatus.Cancelled)
+{
+    <div class="alert alert-danger">
+        <svg class="icon"><use href="#i-alert"></use></svg>
+        <div>
+            <b>Recibo anulado</b> el @Model.CancelledAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm").
+            Motivo: @Model.CancelReason
+        </div>
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card-x">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--primary)"><use href="#i-cart"></use></svg>
+                <h2 class="card-x__title">Productos vendidos</h2>
+            </div>
+            <div class="table-wrap">
+                <table class="table-x">
+                    <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Producto</th>
+                        <th>Categoría</th>
+                        <th class="t-right">P. Unit</th>
+                        <th class="t-center">Cantidad</th>
+                        <th class="t-right">Importe</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td class="num fs-12">@item.ProductCode</td>
+                            <td>
+                                <b>@item.ProductName</b>
+                                @if (!string.IsNullOrWhiteSpace(item.ScannedBarcode))
+                                {
+                                    <div class="line-meta fs-11 text-muted-x num">@item.ScannedBarcode</div>
+                                }
+                            </td>
+                            <td>@item.CategoryName</td>
+                            <td class="t-right money">@c.Format(item.UnitPrice)</td>
+                            <td class="t-center num">@EscPosPrinter.FormatQuantity(item.Quantity) @item.Unit</td>
+                            <td class="t-right money"><b>@c.Format(item.LineTotal)</b></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card-x">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--success)"><use href="#i-coins"></use></svg>
+                <h2 class="card-x__title">Cobro</h2>
+            </div>
+            <div class="card-x__body">
+                <div class="pay__row d-flex justify-content-between mb-1">
+                    <span class="text-soft">Subtotal</span><b class="money">@c.Format(Model.Subtotal)</b>
+                </div>
+                @if (Model.DiscountAmount > 0)
+                {
+                    <div class="pay__row d-flex justify-content-between mb-1">
+                        <span class="text-soft">Descuento</span>
+                        <b class="money text-danger">-@c.Format(Model.DiscountAmount)</b>
+                    </div>
+                }
+                @if (Model.TaxAmount > 0)
+                {
+                    <div class="pay__row d-flex justify-content-between mb-1">
+                        <span class="text-soft">@s.TaxName</span><b class="money">@c.Format(Model.TaxAmount)</b>
+                    </div>
+                }
+                <div class="divider"></div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-uppercase fs-12 text-soft">Total</span>
+                    <b class="money" style="font-size:26px">@c.Format(Model.Total)</b>
+                </div>
+                <div class="divider"></div>
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-soft">Forma de pago</span>
+                    <span class="chip chip--primary">@EscPosPrinter.PaymentLabel(Model.PaymentMethod)</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-soft">Recibido</span><b class="money">@c.Format(Model.AmountReceived)</b>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-soft">Vuelto entregado</span>
+                    <b class="money" style="color:var(--success)">@c.Format(Model.ChangeGiven)</b>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

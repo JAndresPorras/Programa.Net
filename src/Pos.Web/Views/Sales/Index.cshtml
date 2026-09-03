@@ -1,0 +1,120 @@
+@model List<Sale>
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var date = (DateTime)ViewBag.Date;
+    var canSeeAll = (bool)ViewBag.CanSeeAll;
+    var completed = Model.Where(s => s.Status == SaleStatus.Completed).ToList();
+}
+
+<div class="page-head">
+    <div>
+        <h1>Ventas del día</h1>
+        <p>Recibos emitidos el @date.ToString("dd/MM/yyyy"). Desde aquí puede reimprimir o anular.</p>
+    </div>
+    <form method="get" class="page-head__actions">
+        <input type="date" name="date" class="form-control" style="width:auto"
+               value="@date.ToString("yyyy-MM-dd")" />
+        @if (canSeeAll && ViewBag.Users is not null)
+        {
+            <select name="userId" class="form-select" style="width:auto"
+                    asp-items="@((List<SelectListItem>)ViewBag.Users)">
+                <option value="">Todas las cajeras</option>
+            </select>
+        }
+        <button type="submit" class="btn btn-primary">
+            <svg class="icon"><use href="#i-search"></use></svg> Ver
+        </button>
+    </form>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--success">
+            <div class="stat__label">Vendido</div>
+            <div class="stat__value">@c.Format(completed.Sum(s => s.Total))</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat">
+            <div class="stat__label">Recibos</div>
+            <div class="stat__value">@completed.Count</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--info">
+            <div class="stat__label">Ticket promedio</div>
+            <div class="stat__value">@c.Format(completed.Count == 0 ? 0 : completed.Sum(s => s.Total) / completed.Count)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--danger">
+            <div class="stat__label">Anulados</div>
+            <div class="stat__value">@Model.Count(s => s.Status == SaleStatus.Cancelled)</div>
+        </div>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x__head">
+        <svg class="icon" style="color:var(--primary)"><use href="#i-receipt"></use></svg>
+        <h2 class="card-x__title">Recibos</h2>
+        <span class="chip ms-auto">@Model.Count en total</span>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <svg class="icon"><use href="#i-receipt"></use></svg>
+            <p>No hay ventas registradas en esta fecha.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-x">
+                <thead>
+                <tr>
+                    <th>Recibo</th>
+                    <th>Hora</th>
+                    <th>Cajera</th>
+                    <th class="t-center">Artículos</th>
+                    <th>Pago</th>
+                    <th class="t-right">Total</th>
+                    <th class="t-center">Estado</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var sale in Model)
+                {
+                    <tr>
+                        <td><b class="num">@sale.Number</b></td>
+                        <td class="num">@sale.SoldAt.ToLocalTime().ToString("HH:mm")</td>
+                        <td>@sale.UserName</td>
+                        <td class="t-center num">@sale.Items.Count</td>
+                        <td><span class="chip">@EscPosPrinter.PaymentLabel(sale.PaymentMethod)</span></td>
+                        <td class="t-right money"><b>@c.Format(sale.Total)</b></td>
+                        <td class="t-center">
+                            @if (sale.Status == SaleStatus.Completed)
+                            {
+                                <span class="chip chip--success chip--dot">Cerrada</span>
+                            }
+                            else
+                            {
+                                <span class="chip chip--danger chip--dot">Anulada</span>
+                            }
+                        </td>
+                        <td class="t-right">
+                            <a class="btn btn-soft btn-sm" asp-action="Details" asp-route-id="@sale.Id">Ver</a>
+                            <a class="btn btn-soft btn-sm" asp-action="Receipt" asp-route-id="@sale.Id" target="_blank">
+                                <svg class="icon"><use href="#i-print"></use></svg>
+                            </a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

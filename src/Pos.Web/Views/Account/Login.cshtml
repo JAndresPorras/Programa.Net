@@ -1,0 +1,108 @@
+@model LoginViewModel
+@inject ISettingsService SettingsService
+@{
+    Layout = "_LoginLayout";
+    ViewData["Title"] = "Ingresar";
+    var settings = SettingsService.Current;
+}
+
+<div class="login-shell">
+    <section class="login-aside">
+        <div class="login-aside__logo">
+            <svg class="icon icon-xl" style="color:#fff"><use href="#i-store"></use></svg>
+        </div>
+        <h2>@settings.BusinessName</h2>
+        <p>Sistema de punto de venta con lector de código de barras, control de caja y reportes en línea.</p>
+
+        <ul class="login-features">
+            <li>
+                <svg class="icon"><use href="#i-scan"></use></svg>
+                <span>Cobre escaneando con la pistola lectora, sin escribir códigos.</span>
+            </li>
+            <li>
+                <svg class="icon"><use href="#i-print"></use></svg>
+                <span>Recibo impreso al instante en la impresora térmica de 80&nbsp;mm.</span>
+            </li>
+            <li>
+                <svg class="icon"><use href="#i-coins"></use></svg>
+                <span>Cálculo automático del vuelto y entrega de caja al cierre del día.</span>
+            </li>
+            <li>
+                <svg class="icon"><use href="#i-chart"></use></svg>
+                <span>Reportes de ventas y pedido a la planta de producción.</span>
+            </li>
+        </ul>
+    </section>
+
+    <section class="login-form">
+        <h1>Bienvenido</h1>
+        <p class="lead-sm">Ingrese sus credenciales para abrir el punto de venta.</p>
+
+        <form asp-action="Login" method="post" autocomplete="off" novalidate>
+            <input type="hidden" asp-for="ReturnUrl" />
+
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 px-3 mb-3"
+                 role="alert" style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+            <div class="mb-3">
+                <label asp-for="UserName" class="form-label"></label>
+                <div class="field-icon">
+                    <svg class="icon"><use href="#i-user"></use></svg>
+                    <input asp-for="UserName" class="form-control" placeholder="Ej. admin"
+                           autocomplete="username" data-autofocus />
+                </div>
+                <span asp-validation-for="UserName" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label"></label>
+                <div class="field-icon">
+                    <svg class="icon"><use href="#i-lock"></use></svg>
+                    <input asp-for="Password" class="form-control" id="password"
+                           placeholder="••••••••" autocomplete="current-password" />
+                    <button class="toggle-pass" type="button" id="togglePass" aria-label="Ver contraseña">
+                        <svg class="icon"><use href="#i-eye" id="passIcon"></use></svg>
+                    </button>
+                </div>
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+
+            <div class="form-check mb-4">
+                <input asp-for="RememberMe" class="form-check-input" />
+                <label asp-for="RememberMe" class="form-check-label fs-13"></label>
+            </div>
+
+            <button type="submit" class="btn btn-primary login-btn">
+                <svg class="icon"><use href="#i-logout"></use></svg>
+                Ingresar al sistema
+            </button>
+        </form>
+
+        @if (ViewBag.ShowDefaultCredentials == true)
+        {
+            <div class="login-hint">
+                <svg class="icon"><use href="#i-info"></use></svg>
+                Primer ingreso: usuario <b>admin</b> &nbsp;·&nbsp; contraseña <b>Admin123*</b>.
+                Cámbiela desde <i>Mi perfil</i> apenas ingrese.
+            </div>
+        }
+
+        <div class="login-foot">
+            @settings.BusinessName &middot; Punto de venta &middot; @DateTime.Now.Year
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById('togglePass').addEventListener('click', function () {
+            var input = document.getElementById('password');
+            var use = document.querySelector('#togglePass use');
+            var show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            use.setAttribute('href', show ? '#i-eye-off' : '#i-eye');
+            input.focus();
+        });
+    </script>
+}

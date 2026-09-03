@@ -1,0 +1,112 @@
+@model Product
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var history = Model.PriceHistories.ToList();
+}
+
+<div class="page-head">
+    <div>
+        <h1>Historial de precios</h1>
+        <p>@Model.Name &middot; @Model.Code &middot; @Model.Category?.Name</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="Index">
+            <svg class="icon"><use href="#i-back"></use></svg> Volver
+        </a>
+        @if (User.HasPermission(Permissions.ProductsEdit))
+        {
+            <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">
+                <svg class="icon"><use href="#i-edit"></use></svg> Editar producto
+            </a>
+        }
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="stat stat--success">
+            <div class="stat__label">Precio actual</div>
+            <div class="stat__value">@c.Format(Model.Price)</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat">
+            <div class="stat__label">Cambios registrados</div>
+            <div class="stat__value">@history.Count</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat stat--info">
+            <div class="stat__label">Último cambio</div>
+            <div class="stat__value" style="font-size:17px">
+                @(history.Count > 0 ? history[0].ChangedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "Sin cambios")
+            </div>
+            @if (history.Count > 0)
+            {
+                <div class="stat__hint">Por @history[0].ChangedByUserName</div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x__head">
+        <svg class="icon" style="color:var(--warning)"><use href="#i-history"></use></svg>
+        <h2 class="card-x__title">Cambios de precio</h2>
+    </div>
+
+    @if (history.Count == 0)
+    {
+        <div class="empty">
+            <svg class="icon"><use href="#i-history"></use></svg>
+            <p>Este producto todavía no tiene cambios de precio registrados.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-x">
+                <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Usuario que lo hizo</th>
+                    <th class="t-right">Precio anterior</th>
+                    <th class="t-right">Precio nuevo</th>
+                    <th class="t-right">Diferencia</th>
+                    <th class="t-right">Variación</th>
+                    <th>Motivo</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var h in history)
+                {
+                    <tr>
+                        <td class="num">@h.ChangedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        <td class="num">@h.ChangedAt.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td>
+                            <span class="d-inline-flex align-items-center gap-2">
+                                <span class="avatar" style="width:26px;height:26px;font-size:10px">
+                                    @(h.ChangedByUserName.Length > 0 ? h.ChangedByUserName[..1].ToUpper() : "?")
+                                </span>
+                                @h.ChangedByUserName
+                            </span>
+                        </td>
+                        <td class="t-right money">@c.Format(h.OldPrice)</td>
+                        <td class="t-right money"><b>@c.Format(h.NewPrice)</b></td>
+                        <td class="t-right money @(h.Difference >= 0 ? "text-danger" : "text-success")">
+                            @(h.Difference >= 0 ? "+" : "")@c.Format(h.Difference)
+                        </td>
+                        <td class="t-right">
+                            <span class="chip @(h.Difference >= 0 ? "chip--danger" : "chip--success")">
+                                @(h.Difference >= 0 ? "+" : "")@h.PercentChange.ToString("0.##")%
+                            </span>
+                        </td>
+                        <td class="fs-12 text-soft">@(h.Reason ?? "—")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

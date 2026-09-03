@@ -1,0 +1,226 @@
+@model ProductionReport
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var s = (PosSettings)ViewBag.Settings;
+    var from = (DateTime)ViewBag.From;
+    var to = (DateTime)ViewBag.To;
+    var onlyProduced = (bool)ViewBag.OnlyProduced;
+    var autoPrint = (bool)ViewBag.Print;
+    var toOrder = Model.Rows.Where(r => r.SuggestedOrder > 0).ToList();
+}
+
+<div class="page-head no-print">
+    <div>
+        <h1>Pedido a la planta de producción</h1>
+        <p>
+            Se arma con lo que realmente se vendió. Imprima este documento y entréguelo
+            en la planta para reponer lo que falta.
+        </p>
+    </div>
+    <div class="page-head__actions">
+        @if (User.HasPermission(Permissions.ReportsExport))
+        {
+            <a class="btn btn-soft" asp-action="ExportProduction" asp-route-from="@from.ToString("yyyy-MM-dd")"
+               asp-route-to="@to.ToString("yyyy-MM-dd")" asp-route-categoryId="@ViewBag.CategoryId"
+               asp-route-onlyProduced="@onlyProduced">
+                <svg class="icon"><use href="#i-download"></use></svg> Exportar CSV
+            </a>
+        }
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <svg class="icon"><use href="#i-print"></use></svg> Imprimir pedido
+        </button>
+    </div>
+</div>
+
+<div class="card-x mb-3 no-print">
+    <div class="card-x__body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="from">Ventas desde</label>
+                <input type="date" class="form-control" id="from" name="from" value="@from.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="to">Hasta</label>
+                <input type="date" class="form-control" id="to" name="to" value="@to.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="categoryId">Categoría</label>
+                <select class="form-select" id="categoryId" name="categoryId"
+                        asp-items="@((List<SelectListItem>)ViewBag.Categories)">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="onlyProduced" name="onlyProduced"
+                           value="true" checked="@onlyProduced" />
+                    <label class="form-check-label fs-13" for="onlyProduced">Solo lo que se fabrica</label>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary w-100">
+                    <svg class="icon"><use href="#i-search"></use></svg>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Encabezado que sale en el papel -->
+<div class="card-x mb-3">
+    <div class="card-x__body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <div class="fs-11 text-muted-x text-uppercase fw-bold">Pedido de producción</div>
+                <h2 style="font-size:20px;margin:2px 0">@s.BusinessName</h2>
+                <div class="fs-13 text-soft">
+                    Ventas consideradas: @from.ToString("dd/MM/yyyy") al @to.ToString("dd/MM/yyyy")
+                    (@Model.Days @(Model.Days == 1 ? "día" : "días"))
+                </div>
+            </div>
+            <div class="text-end fs-13">
+                <div><span class="text-muted-x">Emitido:</span>
+                    <b class="num">@DateTime.Now.ToString("dd/MM/yyyy HH:mm")</b></div>
+                <div><span class="text-muted-x">Solicita:</span> <b>@User.GetDisplayName()</b></div>
+                <div><span class="text-muted-x">Productos a pedir:</span> <b>@toOrder.Count</b></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3 no-print">
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--success">
+            <div class="stat__label">Unidades a pedir</div>
+            <div class="stat__value">@EscPosPrinter.FormatQuantity(Model.TotalSuggested)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat">
+            <div class="stat__label">Productos en el pedido</div>
+            <div class="stat__value">@toOrder.Count</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--danger">
+            <div class="stat__label">Bajo el stock mínimo</div>
+            <div class="stat__value">@Model.UrgentCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat stat--info">
+            <div class="stat__label">Promedio diario total</div>
+            <div class="stat__value">@EscPosPrinter.FormatQuantity(Model.Rows.Sum(r => r.AveragePerDay))</div>
+        </div>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x__head">
+        <svg class="icon" style="color:var(--primary)"><use href="#i-factory"></use></svg>
+        <h2 class="card-x__title">Detalle del pedido</h2>
+        <span class="chip ms-auto no-print">@Model.Rows.Count productos analizados</span>
+    </div>
+
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="empty">
+            <svg class="icon"><use href="#i-factory"></use></svg>
+            <p>No hubo ventas en el período y todos los productos están sobre su stock mínimo.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-x">
+                <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th class="t-center">Vendido<br /><span class="fs-11">en el período</span></th>
+                    <th class="t-center">Vendido<br /><span class="fs-11">hoy</span></th>
+                    <th class="t-center">Promedio<br /><span class="fs-11">por día</span></th>
+                    <th class="t-center">Stock<br /><span class="fs-11">actual</span></th>
+                    <th class="t-center">Stock<br /><span class="fs-11">mínimo</span></th>
+                    <th class="t-center" style="background:#eff6ff">Cantidad<br /><span class="fs-11">a pedir</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <td class="num fs-12">@row.Code</td>
+                        <td>
+                            <b>@row.Name</b>
+                            @if (row.IsUrgent)
+                            {
+                                <span class="chip chip--danger ms-1">Urgente</span>
+                            }
+                        </td>
+                        <td class="fs-13">@row.CategoryName</td>
+                        <td class="t-center num">@EscPosPrinter.FormatQuantity(row.SoldInPeriod)</td>
+                        <td class="t-center num">@EscPosPrinter.FormatQuantity(row.SoldToday)</td>
+                        <td class="t-center num text-soft">@row.AveragePerDay.ToString("0.##")</td>
+                        <td class="t-center num">@EscPosPrinter.FormatQuantity(row.CurrentStock)</td>
+                        <td class="t-center num text-soft">@EscPosPrinter.FormatQuantity(row.MinStock)</td>
+                        <td class="t-center" style="background:#f8fbff">
+                            @if (row.SuggestedOrder > 0)
+                            {
+                                <b class="num" style="font-size:16px;color:var(--primary)">
+                                    @EscPosPrinter.FormatQuantity(row.SuggestedOrder)
+                                </b>
+                                <div class="fs-11 text-muted-x">@row.Unit</div>
+                            }
+                            else
+                            {
+                                <span class="chip chip--success">Suficiente</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                <tr style="background:#f8fafc">
+                    <td colspan="8"><b>Total de unidades solicitadas a la planta</b></td>
+                    <td class="t-center num" style="background:#eff6ff">
+                        <b style="font-size:17px">@EscPosPrinter.FormatQuantity(Model.TotalSuggested)</b>
+                    </td>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="card-x__foot">
+            <div class="row text-center g-4" style="margin-top:20px">
+                <div class="col-4">
+                    <div style="border-top:1px solid var(--ink);padding-top:6px" class="fs-12">
+                        Solicita<br /><b>@User.GetDisplayName()</b>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div style="border-top:1px solid var(--ink);padding-top:6px" class="fs-12">
+                        Autoriza<br /><b>Administración</b>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div style="border-top:1px solid var(--ink);padding-top:6px" class="fs-12">
+                        Recibe planta<br /><b>&nbsp;</b>
+                    </div>
+                </div>
+            </div>
+            <p class="fs-11 text-muted-x mt-3 mb-0">
+                La cantidad a pedir se calcula como: demanda estimada (el mayor entre el promedio diario
+                y lo vendido hoy) más el stock mínimo, menos el stock actual.
+            </p>
+        </div>
+    }
+</div>
+
+@if (autoPrint)
+{
+    @section Scripts {
+        <script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 320); });</script>
+    }
+}

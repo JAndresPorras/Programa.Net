@@ -1,0 +1,107 @@
+@model List<CashSession>
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var from = (DateTime)ViewBag.From;
+    var to = (DateTime)ViewBag.To;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Historial de cajas</h1>
+        <p>Turnos abiertos y cerrados con el dinero entregado al dueño en cada uno.</p>
+    </div>
+    <form method="get" class="page-head__actions">
+        <input type="date" name="from" class="form-control" style="width:auto" value="@from.ToString("yyyy-MM-dd")" />
+        <input type="date" name="to" class="form-control" style="width:auto" value="@to.ToString("yyyy-MM-dd")" />
+        <button type="submit" class="btn btn-primary">
+            <svg class="icon"><use href="#i-search"></use></svg> Ver
+        </button>
+    </form>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="stat stat--success">
+            <div class="stat__label">Total entregado en el período</div>
+            <div class="stat__value">@c.Format(Model.Sum(s => s.DeliveredToOwner ?? 0))</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat">
+            <div class="stat__label">Turnos</div>
+            <div class="stat__value">@Model.Count</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat @(Model.Sum(s => s.Difference ?? 0) < 0 ? "stat--danger" : "stat--info")">
+            <div class="stat__label">Diferencia acumulada</div>
+            <div class="stat__value">@c.Format(Model.Sum(s => s.Difference ?? 0))</div>
+        </div>
+    </div>
+</div>
+
+<div class="card-x">
+    <div class="card-x__head">
+        <svg class="icon" style="color:var(--primary)"><use href="#i-cash"></use></svg>
+        <h2 class="card-x__title">Turnos</h2>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="empty">
+            <svg class="icon"><use href="#i-cash"></use></svg>
+            <p>No hay turnos de caja en el período seleccionado.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-x">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Cajera</th>
+                    <th>Apertura</th>
+                    <th>Cierre</th>
+                    <th class="t-right">Fondo</th>
+                    <th class="t-right">Contado</th>
+                    <th class="t-right">Diferencia</th>
+                    <th class="t-right">Entregado</th>
+                    <th class="t-center">Estado</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var s in Model)
+                {
+                    <tr>
+                        <td class="num">#@s.Id</td>
+                        <td>@s.UserName</td>
+                        <td class="num fs-12">@s.OpenedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                        <td class="num fs-12">@(s.ClosedAt?.ToLocalTime().ToString("dd/MM HH:mm") ?? "—")</td>
+                        <td class="t-right money">@c.Format(s.OpeningAmount)</td>
+                        <td class="t-right money">@(s.CountedAmount.HasValue ? c.Format(s.CountedAmount.Value) : "—")</td>
+                        <td class="t-right money @((s.Difference ?? 0) < 0 ? "text-danger" : (s.Difference ?? 0) > 0 ? "text-success" : "")">
+                            @(s.Difference.HasValue ? c.Format(s.Difference.Value) : "—")
+                        </td>
+                        <td class="t-right money"><b>@(s.DeliveredToOwner.HasValue ? c.Format(s.DeliveredToOwner.Value) : "—")</b></td>
+                        <td class="t-center">
+                            @if (s.Status == CashSessionStatus.Open)
+                            {
+                                <span class="chip chip--warning chip--dot">Abierta</span>
+                            }
+                            else
+                            {
+                                <span class="chip chip--success chip--dot">Cerrada</span>
+                            }
+                        </td>
+                        <td class="t-right">
+                            <a class="btn btn-soft btn-sm" asp-action="Delivery" asp-route-id="@s.Id">Ver entrega</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -1,0 +1,219 @@
+@model CashSession
+@{
+    var c = (CurrencyInfo)ViewBag.Currency;
+    var s = (PosSettings)ViewBag.Settings;
+    var summary = (CashSessionSummary)ViewBag.Summary;
+    var autoPrint = (bool)ViewBag.Print;
+}
+
+<div class="page-head no-print">
+    <div>
+        <h1>Entrega de caja #@Model.Id</h1>
+        <p>Comprobante del dinero que la cajera entrega al dueño, con el detalle de lo vendido.</p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="Index">
+            <svg class="icon"><use href="#i-back"></use></svg> Volver
+        </a>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <svg class="icon"><use href="#i-print"></use></svg> Imprimir comprobante
+        </button>
+        @if (string.Equals(s.PrinterMode, "network", StringComparison.OrdinalIgnoreCase))
+        {
+            <form asp-action="PrintDelivery" asp-route-id="@Model.Id" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-soft">
+                    <svg class="icon"><use href="#i-print"></use></svg> Imprimir en térmica
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="card-x mb-3">
+    <div class="card-x__body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+                <div class="fs-11 text-muted-x text-uppercase fw-bold">Comprobante de entrega</div>
+                <h2 style="font-size:20px;margin:2px 0">@s.BusinessName</h2>
+                <div class="fs-13 text-soft">@s.BusinessAddress</div>
+            </div>
+            <div class="text-end fs-13">
+                <div><span class="text-muted-x">Turno:</span> <b class="num">#@Model.Id</b></div>
+                <div><span class="text-muted-x">Cajera:</span> <b>@Model.UserName</b></div>
+                <div><span class="text-muted-x">Apertura:</span>
+                    <span class="num">@Model.OpenedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
+                <div><span class="text-muted-x">Cierre:</span>
+                    <span class="num">@(Model.ClosedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "En curso")</span></div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-6 col-lg-3">
+                <div class="stat">
+                    <div class="stat__label">Esperado en caja</div>
+                    <div class="stat__value">@c.Format(Model.ExpectedAmount ?? summary.ExpectedCash)</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="stat stat--info">
+                    <div class="stat__label">Contado</div>
+                    <div class="stat__value">@c.Format(Model.CountedAmount ?? 0)</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="stat @((Model.Difference ?? 0) < 0 ? "stat--danger" : "stat--success")">
+                    <div class="stat__label">Diferencia</div>
+                    <div class="stat__value">@c.Format(Model.Difference ?? 0)</div>
+                    <div class="stat__hint">
+                        @((Model.Difference ?? 0) < 0 ? "Faltante" : (Model.Difference ?? 0) > 0 ? "Sobrante" : "Caja cuadrada")
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="stat stat--success">
+                    <div class="stat__label">Entregado al dueño</div>
+                    <div class="stat__value">@c.Format(Model.DeliveredToOwner ?? 0)</div>
+                    <div class="stat__hint">Queda en caja @c.Format(Model.LeftInDrawer ?? 0)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card-x mb-3">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--primary)"><use href="#i-coins"></use></svg>
+                <h2 class="card-x__title">Detalle del dinero</h2>
+            </div>
+            <div class="card-x__body">
+                <div class="d-flex justify-content-between py-1">
+                    <span class="text-soft">Fondo inicial</span><b class="money">@c.Format(summary.OpeningAmount)</b>
+                </div>
+                <div class="d-flex justify-content-between py-1">
+                    <span class="text-soft">Ventas en efectivo</span>
+                    <b class="money text-success">+@c.Format(summary.CashSales)</b>
+                </div>
+                @if (summary.CardSales > 0)
+                {
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-soft">Ventas con tarjeta</span><b class="money">@c.Format(summary.CardSales)</b>
+                    </div>
+                }
+                @if (summary.TransferSales > 0)
+                {
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-soft">Transferencias</span><b class="money">@c.Format(summary.TransferSales)</b>
+                    </div>
+                }
+                @if (summary.MovementsIn > 0)
+                {
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-soft">Otros ingresos</span>
+                        <b class="money text-success">+@c.Format(summary.MovementsIn)</b>
+                    </div>
+                }
+                @if (summary.MovementsOut > 0)
+                {
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-soft">Retiros de efectivo</span>
+                        <b class="money text-danger">-@c.Format(summary.MovementsOut)</b>
+                    </div>
+                }
+                @if (summary.CancelledCount > 0)
+                {
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-soft">Recibos anulados (@summary.CancelledCount)</span>
+                        <b class="money text-muted-x">@c.Format(summary.CancelledTotal)</b>
+                    </div>
+                }
+                <div class="divider"></div>
+                <div class="d-flex justify-content-between">
+                    <span class="fw-bold">Total vendido</span>
+                    <b class="money" style="font-size:19px">@c.Format(summary.TotalSales)</b>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                {
+                    <div class="divider"></div>
+                    <div class="fs-12"><b>Observaciones:</b> @Model.Notes</div>
+                }
+            </div>
+        </div>
+
+        <div class="card-x">
+            <div class="card-x__body">
+                <div class="row text-center g-4" style="margin-top:26px">
+                    <div class="col-6">
+                        <div style="border-top:1px solid var(--ink);padding-top:6px" class="fs-12">
+                            Entrega<br /><b>@Model.UserName</b>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div style="border-top:1px solid var(--ink);padding-top:6px" class="fs-12">
+                            Recibe<br /><b>Dueño / Administración</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card-x">
+            <div class="card-x__head">
+                <svg class="icon" style="color:var(--success)"><use href="#i-box"></use></svg>
+                <h2 class="card-x__title">Productos vendidos en el turno</h2>
+                <span class="chip ms-auto">@summary.Products.Count productos</span>
+            </div>
+            @if (summary.Products.Count == 0)
+            {
+                <div class="empty"><p>No hubo ventas en este turno.</p></div>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table-x">
+                        <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Categoría</th>
+                            <th class="t-center">Cantidad</th>
+                            <th class="t-right">Importe</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in summary.Products)
+                        {
+                            <tr>
+                                <td class="num fs-12">@row.Code</td>
+                                <td><b>@row.Name</b></td>
+                                <td class="fs-13">@row.CategoryName</td>
+                                <td class="t-center num">@EscPosPrinter.FormatQuantity(row.Quantity) @row.Unit</td>
+                                <td class="t-right money"><b>@c.Format(row.Total)</b></td>
+                            </tr>
+                        }
+                        </tbody>
+                        <tfoot>
+                        <tr style="background:#f8fafc">
+                            <td colspan="3"><b>Total</b></td>
+                            <td class="t-center num"><b>@EscPosPrinter.FormatQuantity(summary.UnitsSold)</b></td>
+                            <td class="t-right money"><b>@c.Format(summary.Products.Sum(p => p.Total))</b></td>
+                        </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (autoPrint)
+{
+    @section Scripts {
+        <script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 320); });</script>
+    }
+}
