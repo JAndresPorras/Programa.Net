@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Demostración · Precio al público</title>
+<link rel="stylesheet" href="precio-publico.css" />
+<style>
+    /* Estos estilos son solo de la demostración, imitan su pantalla actual. */
+    body { font-family: "Segoe UI", system-ui, sans-serif; background: #eef2f7;
+           margin: 0; padding: 24px; color: #0f172a; }
+    .wrap { max-width: 860px; margin: 0 auto; }
+    .aviso-ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;
+                border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 15px; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+    .card h2 { font-size: 20px; margin: 0; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
+    .body { padding: 20px 24px; }
+    .row { display: flex; gap: 18px; flex-wrap: wrap; }
+    .col { flex: 1 1 240px; }
+    label.campo { display: block; font-size: 14px; margin-bottom: 6px; color: #0f172a; }
+    input[type=text], input[type=number], select {
+        width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1;
+        border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+    .grupo { margin-bottom: 18px; }
+    .checks { display: flex; gap: 26px; margin: 18px 0 6px; flex-wrap: wrap; }
+    .form-check { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+    .pista { color: #94a3b8; font-size: 13px; line-height: 1.5; }
+    .guardar { background: #4f46e5; color: #fff; border: none; border-radius: 8px;
+               padding: 13px 22px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="aviso-ok">✓ Producto actualizado.</div>
+
+    <div class="card">
+        <h2>Datos del producto</h2>
+        <div class="body">
+            <form id="formProducto">
+                <div class="row grupo">
+                    <div class="col">
+                        <label class="campo" for="Codigo">Código de producto</label>
+                        <input type="text" id="Codigo" value="Pilsen Lata Pequeña" />
+                    </div>
+                    <div class="col">
+                        <label class="campo" for="Categoria">Categoría</label>
+                        <select id="Categoria"><option>Licor</option></select>
+                    </div>
+                </div>
+
+                <div class="grupo">
+                    <label class="campo" for="Nombre">Nombre</label>
+                    <input type="text" id="Nombre" value="Pilsen Lata Pequeña" />
+                </div>
+
+                <div class="row grupo">
+                    <div class="col">
+                        <label class="campo" for="Precio">Precio de venta (S/)</label>
+                        <input type="number" id="Precio" step="0.01" value="4.95" />
+                    </div>
+                    <div class="col">
+                        <label class="campo" for="Motivo">Motivo del cambio de precio</label>
+                        <input type="text" id="Motivo" placeholder="Opcional: alza de insumos, promoción" />
+                    </div>
+                </div>
+
+                <div class="checks">
+                    <div class="form-check">
+                        <input type="checkbox" id="Disponible" checked />
+                        <label for="Disponible">Disponible para la venta</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" id="PorPeso" />
+                        <label for="PorPeso">Se vende por peso (kg)</label>
+                    </div>
+                </div>
+
+                <div class="pista">
+                    Marque «Se vende por peso» en lo que se pesa (quesos): el precio pasa a ser el precio
+                    del <b>KILO</b> y en la caja se digita el peso, por ejemplo 1,750.
+                </div>
+
+                <button type="submit" class="guardar">✓ Guardar cambios</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="precio-publico.js"></script>
+<script>
+    // Solo para la demostración: avisa si el formulario llegó a enviarse.
+    document.getElementById('formProducto').addEventListener('submit', function (e) {
+        e.preventDefault();
+        window.__enviado = true;
+    });
+</script>
+</body>
+</html>
