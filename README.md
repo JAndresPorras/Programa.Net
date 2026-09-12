@@ -14,6 +14,8 @@ día se hace la entrega de caja al dueño.
 |---|---|
 | **Punto de venta** (pantalla inicial) | Se escanea con la pistola, se arma el ticket, se calcula el vuelto y se imprime el recibo. |
 | **Maestro de códigos de barras** | Cada código apunta a un producto con categoría, código, nombre, precio e imagen opcional. Un producto puede tener varios códigos. |
+| **Precios pagables** | Al escribir el precio se ve el **precio al público** con impuesto y el sistema avisa cuánto subir o bajar para que se pueda pagar exacto con las monedas del país. |
+| **Venta por peso** | Los productos marcados por peso piden los kilos en el punto de venta (2 enteros y 3 decimales) y calculan el importe. |
 | **Historial de precios** | Cada cambio de precio guarda precio anterior, precio nuevo, fecha, hora, usuario y motivo. |
 | **Usuarios, roles y permisos** | 22 permisos finos agrupados por módulo. El rol da los permisos base y a cada persona se le pueden sumar permisos extra. |
 | **Caja del día** | Apertura con fondo inicial, ingresos y retiros de efectivo, arqueo por denominaciones y **entrega de caja al dueño**. |
@@ -200,13 +202,59 @@ moneda con la que se cobraron**, así que los reportes históricos no se alteran
 > Cambiar la moneda **no convierte los precios**: no es un tipo de cambio, es la
 > moneda con la que trabaja la caja. Si cambia de país, revise la lista de precios.
 
+### Precios que se puedan pagar exactos
+
+En Perú ya no circulan las monedas de 1 y 5 céntimos: la más pequeña es
+**S/ 0.10**. Un precio de S/ 4.17 obliga a perder céntimos en cada venta, así que
+el sistema no lo permite y ayuda a corregirlo.
+
+Al escribir el precio del producto aparecen tres cosas:
+
+1. **Precio al público**, al lado derecho del campo. Si el impuesto viene
+   incluido muestra además el neto; si se suma aparte, muestra precio + impuesto.
+2. Un **aviso que dice exactamente cuánto ajustar**:
+   *«S/ 4.17 no se puede pagar exacto. En Soles peruanos la moneda más pequeña
+   es S/ 0.10, así que hay que bajar S/ 0.07 o subir S/ 0.03.»*
+3. Dos **botones para aplicarlo de una vez**:
+   `▼ Bajar S/ 0.07 → S/ 4.10` y `▲ Subir S/ 0.03 → S/ 4.20`.
+
+El precio se valida también en el servidor, de modo que no entra un precio
+impagable ni escribiéndolo a mano.
+
+### Redondeo del total
+
+Aunque todos los precios sean exactos, un pesaje o un descuento pueden dejar el
+total en S/ 33.04. Con **Redondear el total al efectivo** activado el sistema
+cobra S/ 33.00 y el ajuste sale detallado como *Redondeo* en el recibo, en el
+detalle de la venta y en la caja, para que nunca falte ni sobre dinero en el
+arqueo.
+
+Ambas opciones se activan o desactivan en **Configuración → Moneda**.
+
 ---
 
-## 7. El día de trabajo
+## 7. Productos que se venden por peso
+
+Marque **«Se vende por peso»** en el producto y cargue el precio **por kilo**.
+En la misma pantalla aparece una **calculadora de peso** para comprobar cuánto
+se le cobrará al cliente antes de guardar.
+
+En el punto de venta, cuando la cajera dispara la pistola sobre un producto por
+peso, se abre la **balanza**: escribe los kilos (hasta **2 enteros y 3
+decimales**, máximo 99.999), ve el importe calculado en vivo y lo agrega al
+ticket. El peso queda visible en la línea y se corrige presionándolo.
+
+También funciona escribiendo `0.755*7750001000121` directo en el campo de
+escaneo, para cuando la balanza ya imprimió el peso.
+
+---
+
+## 8. El día de trabajo
 
 1. **Abrir caja** — *Caja del día* → fondo inicial (el sencillo con el que arranca).
 2. **Vender** — escanear, escribir el dinero recibido, `F2`. El sistema muestra el
-   vuelto en grande y manda el recibo a la impresora.
+   vuelto en grande y manda el recibo a la impresora. Si el producto se vende por
+   peso, primero pide los kilos en la balanza.
 3. **El ojito** — en la barra superior, el botón del ojo revela cuánto lleva
    recolectado la cajera en el turno. Está oculto por defecto y se vuelve a
    ocultar solo a los 20 segundos.
@@ -227,7 +275,7 @@ moneda con la que se cobraron**, así que los reportes históricos no se alteran
 
 ---
 
-## 8. Permisos
+## 9. Permisos
 
 Tres roles listos para usar, editables desde *Usuarios → Permisos por rol*:
 
@@ -243,7 +291,7 @@ rol sin cambiarle el rol a nadie más.
 
 ---
 
-## 9. Cómo está organizado el código
+## 10. Cómo está organizado el código
 
 ```
 src/Pos.Web/

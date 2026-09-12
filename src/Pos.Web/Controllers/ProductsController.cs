@@ -99,6 +99,8 @@ public class ProductsController(
                 "Registre al menos un código de barras para poder escanear el producto.");
         }
 
+        await ValidateCashPriceAsync(model.Price);
+
         var taken = await db.Barcodes.Where(b => barcodes.Contains(b.Code)).Select(b => b.Code).ToListAsync();
         if (taken.Count > 0)
         {
@@ -238,6 +240,10 @@ public class ProductsController(
         // Sin el permiso de cambiar precios el campo se ignora y se conserva el actual.
         if (!model.CanChangePrice) model.Price = product.Price;
 
+        // Solo se exige el múltiplo de moneda cuando el precio realmente cambia, para
+        // no bloquear la edición de un producto viejo cargado con otra configuración.
+        if (model.Price != product.Price) await ValidateCashPriceAsync(model.Price);
+
         if (!ModelState.IsValid) return View("Form", model);
 
         var priceChanged = product.Price != model.Price;
@@ -354,6 +360,31 @@ public class ProductsController(
             ? $"{product.Name} fue activado."
             : $"{product.Name} fue desactivado y ya no se puede vender.";
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Comprueba que el precio que paga el cliente se pueda cobrar con las monedas
+    /// que existen. En Peru no hay monedas de 1 ni 5 centimos, asi que un precio de
+    /// S/ 4.17 obligaria a perder centimos en cada venta.
+    /// </summary>
+    private async Task ValidateCashPriceAsync(decimal price)
+    {
+        var config = await settings.GetAsync();
+        if (!config.PriceCashSteps) return;
+
+        var currency = config.Currency;
+        var publicPrice = config.PublicPrice(price);
+        if (currency.IsCashAmount(publicPrice)) return;
+
+        var down = currency.FloorCash(publicPrice);
+        var up = currency.CeilCash(publicPrice);
+        var label = config.TaxAddedOnTop ? "El precio al público" : "El precio";
+
+        ModelState.AddModelError(nameof(ProductFormViewModel.Price),
+            $"{label} queda en {currency.Format(publicPrice)} y no se puede pagar exacto: " +
+            $"en {currency.Name} la moneda más pequeña es {currency.Format(currency.CashRounding)}. " +
+            $"Baje {currency.Format(currency.DownTo(publicPrice))} para llegar a {currency.Format(down)} " +
+            $"o suba {currency.Format(currency.UpTo(publicPrice))} para llegar a {currency.Format(up)}.");
     }
 
     private async Task<List<Category>> CategoriesAsync() =>

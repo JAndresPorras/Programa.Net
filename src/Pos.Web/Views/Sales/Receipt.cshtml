@@ -167,6 +167,14 @@
                 </div>
             }
 
+            @if (Model.RoundingAdjustment != 0)
+            {
+                <div class="r-line">
+                    <span>Redondeo</span>
+                    <span>@(Model.RoundingAdjustment > 0 ? "+" : "")@c.Format(Model.RoundingAdjustment)</span>
+                </div>
+            }
+
             <div class="r-total"><span>TOTAL</span><span>@c.Format(Model.Total)</span></div>
 
             <div class="r-line"><span>@EscPosPrinter.PaymentLabel(Model.PaymentMethod)</span>

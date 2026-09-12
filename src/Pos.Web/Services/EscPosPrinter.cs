@@ -89,6 +89,9 @@ public class EscPosPrinter(ISettingsService settings, ILogger<EscPosPrinter> log
             AddLine(buffer, Columns("Descuento", "-" + currency.Format(sale.DiscountAmount), width), width);
         if (sale.TaxAmount > 0)
             AddLine(buffer, Columns($"{config.TaxName} {config.TaxRate:0.##}%", currency.Format(sale.TaxAmount), width), width);
+        if (sale.RoundingAdjustment != 0)
+            AddLine(buffer, Columns("Redondeo",
+                (sale.RoundingAdjustment > 0 ? "+" : "") + currency.Format(sale.RoundingAdjustment), width), width);
 
         buffer.AddRange(SizeDoubleHeight);
         buffer.AddRange(BoldOn);
@@ -253,10 +256,14 @@ public class EscPosPrinter(ISettingsService settings, ILogger<EscPosPrinter> log
         return left + new string(' ', space) + right;
     }
 
+    /// <summary>
+    /// Unidades enteras se muestran sin decimales y los pesajes siempre con los
+    /// tres decimales de la balanza: 3 unidades, pero 0.755 kg y 1.200 kg.
+    /// </summary>
     internal static string FormatQuantity(decimal quantity) =>
         quantity == Math.Floor(quantity)
             ? ((int)quantity).ToString(CultureInfo.InvariantCulture)
-            : quantity.ToString("0.###", CultureInfo.InvariantCulture);
+            : quantity.ToString("0.000", CultureInfo.InvariantCulture);
 
     internal static string PaymentLabel(PaymentMethod method) => method switch
     {

@@ -15,7 +15,11 @@ public sealed class CurrencyInfo
     public required string CultureName { get; init; }
     public int Decimals { get; init; } = 2;
 
-    /// <summary>Multiplo al que se redondea el vuelto (la moneda mas pequena en circulacion).</summary>
+    /// <summary>
+    /// Moneda mas pequena que existe en circulacion. En Peru es S/ 0.10 porque
+    /// los centimos de 1 y 5 ya no circulan, y en Colombia son 50 pesos.
+    /// Todo importe que se cobre en efectivo tiene que ser multiplo de este valor.
+    /// </summary>
     public decimal CashRounding { get; init; } = 0.10m;
 
     /// <summary>Billetes, de mayor a menor, para los botones de pago rapido.</summary>
@@ -54,8 +58,49 @@ public sealed class CurrencyInfo
         return Math.Round(steps * CashRounding, Decimals, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// Redondea un total a cobrar al efectivo, pero nunca lo deja en cero cuando
+    /// habia importe: un ticket de 10 pesos con moneda minima de 50 se cobra 50,
+    /// no se regala.
+    /// </summary>
+    public decimal RoundCashTotal(decimal amount)
+    {
+        var rounded = RoundCash(amount);
+        return amount > 0 && rounded <= 0 ? CeilCash(amount) : rounded;
+    }
+
     /// <summary>Redondea un importe a los decimales de la moneda.</summary>
     public decimal Round(decimal amount) => Math.Round(amount, Decimals, MidpointRounding.AwayFromZero);
+
+    /// <summary>Baja el importe al multiplo de moneda anterior. S/ 4.17 -> S/ 4.10</summary>
+    public decimal FloorCash(decimal amount)
+    {
+        if (CashRounding <= 0) return Round(amount);
+        return Round(Math.Floor(amount / CashRounding) * CashRounding);
+    }
+
+    /// <summary>Sube el importe al multiplo de moneda siguiente. S/ 4.17 -> S/ 4.20</summary>
+    public decimal CeilCash(decimal amount)
+    {
+        if (CashRounding <= 0) return Round(amount);
+        return Round(Math.Ceiling(amount / CashRounding) * CashRounding);
+    }
+
+    /// <summary>
+    /// Verdadero si el importe se puede pagar exacto con las monedas que existen.
+    /// S/ 4.20 si, S/ 4.17 no (haria falta un centimo que ya no circula).
+    /// </summary>
+    public bool IsCashAmount(decimal amount)
+    {
+        if (CashRounding <= 0) return true;
+        return Round(amount) % CashRounding == 0m;
+    }
+
+    /// <summary>Cuanto hay que bajar el importe para que se pueda pagar exacto.</summary>
+    public decimal DownTo(decimal amount) => Round(amount - FloorCash(amount));
+
+    /// <summary>Cuanto hay que subir el importe para que se pueda pagar exacto.</summary>
+    public decimal UpTo(decimal amount) => Round(CeilCash(amount) - amount);
 
     /// <summary>Sugerencias de pago rapido: el importe exacto y los billetes utiles por encima.</summary>
     public IReadOnlyList<decimal> QuickAmounts(decimal total)

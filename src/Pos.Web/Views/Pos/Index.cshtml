@@ -91,6 +91,9 @@
                 <div class="pay__row" id="rowDiscount" style="display:none">
                     <span>Descuento</span><b class="text-danger" id="sumDiscount">-</b>
                 </div>
+                <div class="pay__row" id="rowRounding" style="display:none">
+                    <span>Redondeo al efectivo</span><b id="sumRounding">-</b>
+                </div>
                 <div class="pay__row"><span>Unidades</span><b id="sumUnits">0</b></div>
                 <div class="pay__total">
                     <span>Total</span>
@@ -185,6 +188,54 @@
                     </div>
                 </div>
                 <div class="search-results" id="searchResults"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================ Modal: peso del producto -->
+<div class="modal fade" id="weightModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <svg class="icon"><use href="#i-coins"></use></svg> Pesar producto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="weigh-head">
+                    <div>
+                        <div class="weigh-name" id="weighName"></div>
+                        <div class="weigh-meta" id="weighMeta"></div>
+                    </div>
+                </div>
+
+                <label class="pay__label mt-3" for="weighInput">Peso de la balanza</label>
+                <div class="input-group">
+                    <input type="number" class="form-control received-input" id="weighInput"
+                           min="0" max="99.999" step="0.001" placeholder="0.000" inputmode="decimal" />
+                    <span class="input-group-text fs-5" id="weighUnit">KG</span>
+                </div>
+                <div class="form-hint">Hasta 2 enteros y 3 decimales (máximo 99.999).</div>
+
+                <div class="quick-grid" id="weighQuick"></div>
+
+                <div class="change-box mt-3">
+                    <span>Se cobra</span>
+                    <b id="weighAmount">@c.Format(0)</b>
+                </div>
+
+                <div class="alert alert-warning mt-3 mb-0 py-2" id="weighWarn" style="display:none">
+                    <svg class="icon"><use href="#i-alert"></use></svg>
+                    <div class="fs-12" id="weighWarnText"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-soft" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="weighConfirm">
+                    <svg class="icon"><use href="#i-check"></use></svg> Agregar al ticket
+                </button>
             </div>
         </div>
     </div>

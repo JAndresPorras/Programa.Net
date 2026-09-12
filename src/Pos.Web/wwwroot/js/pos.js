@@ -16,6 +16,8 @@
         subtotal: document.getElementById('sumSubtotal'),
         discountRow: document.getElementById('rowDiscount'),
         discountText: document.getElementById('sumDiscount'),
+        roundingRow: document.getElementById('rowRounding'),
+        roundingText: document.getElementById('sumRounding'),
         units: document.getElementById('sumUnits'),
         total: document.getElementById('sumTotal'),
         received: document.getElementById('receivedInput'),
@@ -72,22 +74,28 @@
             const tr = document.createElement('tr');
             if (line.productId === newProductId) { tr.className = 'is-new'; }
 
-            const step = line.soldByWeight ? '0.001' : '1';
+            // Un producto pesado no se cuenta de uno en uno: muestra los kilos
+            // y al presionarlos se vuelve a abrir la balanza para corregirlos.
+            const qtyCell = line.soldByWeight
+                ? '<button type="button" class="weight-chip" data-act="weigh">' +
+                      '<svg class="icon"><use href="#i-coins"></use></svg>' +
+                      line.quantityText + ' ' + line.unit +
+                  '</button>'
+                : '<div class="qty">' +
+                      '<button type="button" data-act="dec" aria-label="Quitar uno">' +
+                          '<svg class="icon"><use href="#i-minus"></use></svg></button>' +
+                      '<input type="number" min="0" step="1" value="' + line.quantity + '" aria-label="Cantidad" />' +
+                      '<button type="button" data-act="inc" aria-label="Agregar uno">' +
+                          '<svg class="icon"><use href="#i-plus"></use></svg></button>' +
+                  '</div>';
+
             tr.innerHTML =
                 '<td>' +
                     '<div class="line-name"></div>' +
                     '<div class="line-meta"></div>' +
                 '</td>' +
                 '<td class="t-right money">' + line.unitPriceText + '</td>' +
-                '<td class="t-center">' +
-                    '<div class="qty">' +
-                        '<button type="button" data-act="dec" aria-label="Quitar uno">' +
-                            '<svg class="icon"><use href="#i-minus"></use></svg></button>' +
-                        '<input type="number" min="0" step="' + step + '" value="' + line.quantity + '" aria-label="Cantidad" />' +
-                        '<button type="button" data-act="inc" aria-label="Agregar uno">' +
-                            '<svg class="icon"><use href="#i-plus"></use></svg></button>' +
-                    '</div>' +
-                '</td>' +
+                '<td class="t-center">' + qtyCell + '</td>' +
                 '<td class="t-right line-total">' + line.lineTotalText + '</td>' +
                 '<td class="t-center">' +
                     '<button type="button" class="line-del" data-act="del" aria-label="Quitar del ticket">' +
@@ -104,14 +112,17 @@
                     if (act === 'del') { removeLine(line.productId); }
                     if (act === 'inc') { setQuantity(line.productId, Number(line.quantity) + 1); }
                     if (act === 'dec') { setQuantity(line.productId, Number(line.quantity) - 1); }
+                    if (act === 'weigh') { openWeight(line, true); }
                 });
             });
 
             const input = tr.querySelector('.qty input');
-            input.addEventListener('change', function () { setQuantity(line.productId, Number(input.value)); });
-            input.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-            });
+            if (input) {
+                input.addEventListener('change', function () { setQuantity(line.productId, Number(input.value)); });
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                });
+            }
 
             el.body.appendChild(tr);
         });
@@ -125,6 +136,14 @@
             el.discountText.textContent = '-' + cart.discountText;
         } else {
             el.discountRow.style.display = 'none';
+        }
+
+        // El redondeo aparece solo cuando el total no se podia pagar exacto.
+        if (cart.rounding && Number(cart.rounding) !== 0) {
+            el.roundingRow.style.display = '';
+            el.roundingText.textContent = (Number(cart.rounding) > 0 ? '+' : '') + cart.roundingText;
+        } else {
+            el.roundingRow.style.display = 'none';
         }
 
         renderQuickAmounts();
@@ -185,6 +204,13 @@
             if (res.cart) { cart = res.cart; }
             const added = res.data && res.data.addedProductId;
             render(added);
+
+            // El producto se vende por peso: se pide el pesaje antes de agregarlo.
+            if (res.data && res.data.needsWeight) {
+                openWeight(res.data.product, false);
+                return res;
+            }
+
             if (okMessage || res.message) { window.posToast(res.message || okMessage, res.messageKind || 'success'); }
             return res;
         }).catch(function () {
@@ -198,7 +224,9 @@
 
     function scan(code, quantity) {
         if (!code) { return; }
-        handle(post(cfg.urls.scan, { barcode: code, quantity: quantity || 1 }));
+        // quantity va nulo cuando solo se disparo el codigo: si el producto se
+        // vende pesado, el servidor responde pidiendo los kilos.
+        handle(post(cfg.urls.scan, { barcode: code, quantity: quantity || null }));
     }
 
     function setQuantity(productId, quantity) {
@@ -226,7 +254,7 @@
         if (!raw) { return; }
 
         // Permite "3*7501234567890" para vender 3 unidades de un tirón.
-        let quantity = 1;
+        let quantity = null;
         const multiplier = raw.match(/^(\d+(?:[.,]\d+)?)\s*[*xX]\s*(.+)$/);
         if (multiplier) {
             quantity = Number(multiplier[1].replace(',', '.'));
@@ -287,6 +315,113 @@
             handle(post(cfg.urls.discount, { amount: Number(el.discountInput.value || 0) }));
         });
     }
+
+    /* --------------------------------------- Pesaje de productos por kg -- */
+    const weightModal = new bootstrap.Modal(document.getElementById('weightModal'));
+    const weighInput = document.getElementById('weighInput');
+    const weighAmount = document.getElementById('weighAmount');
+    const weighQuick = document.getElementById('weighQuick');
+    const weighWarn = document.getElementById('weighWarn');
+    const weighWarnText = document.getElementById('weighWarnText');
+    const MAX_WEIGHT = 99.999;
+
+    // Producto que se está pesando y si se corrige una línea ya cargada.
+    let weighing = null;
+    let weighReplaces = false;
+
+    /* Deja el peso en 2 enteros y 3 decimales. */
+    function cleanWeight(value) {
+        let kilos = Number(value);
+        if (!isFinite(kilos) || kilos < 0) { kilos = 0; }
+        if (kilos > MAX_WEIGHT) { kilos = MAX_WEIGHT; }
+        return Math.round(kilos * 1000) / 1000;
+    }
+
+    function refreshWeight() {
+        const kilos = cleanWeight(weighInput.value);
+        const price = Number(weighing ? weighing.price : 0);
+        weighAmount.textContent = money(price * kilos);
+
+        const tooBig = Number(weighInput.value) > MAX_WEIGHT;
+        weighWarn.style.display = tooBig ? '' : 'none';
+        if (tooBig) {
+            weighWarnText.textContent = 'El peso máximo por línea es ' + MAX_WEIGHT.toFixed(3) +
+                                        '. Se va a usar ese valor.';
+        }
+    }
+
+    /*
+     * Abre la balanza. Desde el escaneo suma el pesaje al ticket y desde la
+     * línea del ticket reemplaza el peso que ya estaba cargado.
+     */
+    function openWeight(product, replaces) {
+        weighing = {
+            productId: product.productId || product.id,
+            name: product.name,
+            code: product.code,
+            unit: product.unit || 'KG',
+            price: Number(product.unitPrice !== undefined ? product.unitPrice : product.price),
+            priceText: product.unitPriceText || product.priceText
+        };
+        weighReplaces = !!replaces;
+
+        document.getElementById('weighName').textContent = weighing.name;
+        document.getElementById('weighMeta').textContent =
+            weighing.code + ' · ' + weighing.priceText + ' por ' + weighing.unit;
+        document.getElementById('weighUnit').textContent = weighing.unit;
+        document.getElementById('weighConfirm').lastChild.textContent =
+            weighReplaces ? ' Corregir el peso' : ' Agregar al ticket';
+
+        weighInput.value = weighReplaces ? Number(product.quantity).toFixed(3) : '';
+
+        // Pesos frecuentes para no escribirlos a mano.
+        weighQuick.innerHTML = '';
+        [0.25, 0.5, 0.75, 1, 1.5, 2].forEach(function (kilos) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'quick-btn';
+            btn.textContent = kilos.toFixed(3);
+            // El peso no debe perder el foco al elegir un valor rapido.
+            btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            btn.addEventListener('click', function () {
+                weighInput.value = kilos.toFixed(3);
+                refreshWeight();
+                weighInput.focus();
+            });
+            weighQuick.appendChild(btn);
+        });
+
+        refreshWeight();
+        weightModal.show();
+        setTimeout(function () { weighInput.focus(); weighInput.select(); }, 220);
+    }
+
+    function confirmWeight() {
+        const kilos = cleanWeight(weighInput.value);
+        if (kilos <= 0) {
+            window.posToast('Escriba el peso de la balanza.', 'danger');
+            weighInput.focus();
+            return;
+        }
+
+        weightModal.hide();
+        if (weighReplaces) {
+            setQuantity(weighing.productId, kilos);
+        } else {
+            handle(post(cfg.urls.addProduct, { productId: weighing.productId, quantity: kilos }));
+        }
+    }
+
+    weighInput.addEventListener('input', refreshWeight);
+    weighInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); confirmWeight(); }
+    });
+    weighInput.addEventListener('blur', function () {
+        if (weighInput.value !== '') { weighInput.value = cleanWeight(weighInput.value).toFixed(3); }
+        refreshWeight();
+    });
+    document.getElementById('weighConfirm').addEventListener('click', confirmWeight);
+    document.getElementById('weightModal').addEventListener('hidden.bs.modal', focusScanner);
 
     /* ------------------------------------------------- Buscar producto --- */
     const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));

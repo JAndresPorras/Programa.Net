@@ -118,6 +118,8 @@ public static class DbSeeder
             [SettingKeys.ReceiptSeries] = "B001",
             [SettingKeys.ReceiptPrintAuto] = "True",
             [SettingKeys.ReceiptCopies] = "1",
+            [SettingKeys.PriceCashSteps] = "True",
+            [SettingKeys.TotalCashRounding] = "True",
             [SettingKeys.PrinterMode] = "browser",
             [SettingKeys.PrinterHost] = "192.168.1.100",
             [SettingKeys.PrinterPort] = "9100",
@@ -148,18 +150,23 @@ public static class DbSeeder
         db.Categories.AddRange(categories);
         await db.SaveChangesAsync();
 
-        var seedProducts = new (string Cat, string Code, string Name, decimal Price, string Barcode, string Unit, bool Produced)[]
+        // Los precios son multiplos de la moneda mas pequena para que el total
+        // siempre se pueda cobrar exacto. Los marcados por peso se venden en kilos.
+        var seedProducts = new (string Cat, string Code, string Name, decimal Price, string Barcode,
+                                string Unit, bool Produced, bool ByWeight)[]
         {
-            ("Panaderia",  "PAN-001", "Pan frances (unidad)",      0.50m, "7750001000015", "UND", true),
-            ("Panaderia",  "PAN-002", "Pan integral 500g",         6.50m, "7750001000022", "UND", true),
-            ("Panaderia",  "PAN-003", "Ciabatta artesanal",        3.00m, "7750001000039", "UND", true),
-            ("Pasteleria", "PAS-001", "Torta de chocolate porcion",8.00m, "7750001000046", "UND", true),
-            ("Pasteleria", "PAS-002", "Alfajor de manjar",         2.50m, "7750001000053", "UND", true),
-            ("Bebidas",    "BEB-001", "Agua mineral 625ml",        2.00m, "7750001000060", "UND", false),
-            ("Bebidas",    "BEB-002", "Gaseosa 500ml",             3.50m, "7750001000077", "UND", false),
-            ("Bebidas",    "BEB-003", "Jugo de naranja 1L",        9.90m, "7750001000084", "UND", false),
-            ("Abarrotes",  "ABA-001", "Arroz extra 1kg",           4.80m, "7750001000091", "KG",  false),
-            ("Abarrotes",  "ABA-002", "Azucar rubia 1kg",          4.20m, "7750001000107", "KG",  false)
+            ("Panaderia",  "PAN-001", "Pan frances (unidad)",      0.50m, "7750001000015", "UND", true,  false),
+            ("Panaderia",  "PAN-002", "Pan integral 500g",         6.50m, "7750001000022", "UND", true,  false),
+            ("Panaderia",  "PAN-003", "Ciabatta artesanal",        3.00m, "7750001000039", "UND", true,  false),
+            ("Panaderia",  "PAN-004", "Pan de yema (por kilo)",   12.50m, "7750001000114", "KG",  true,  true),
+            ("Pasteleria", "PAS-001", "Torta de chocolate porcion",8.00m, "7750001000046", "UND", true,  false),
+            ("Pasteleria", "PAS-002", "Alfajor de manjar",         2.50m, "7750001000053", "UND", true,  false),
+            ("Bebidas",    "BEB-001", "Agua mineral 625ml",        2.00m, "7750001000060", "UND", false, false),
+            ("Bebidas",    "BEB-002", "Gaseosa 500ml",             3.50m, "7750001000077", "UND", false, false),
+            ("Bebidas",    "BEB-003", "Jugo de naranja 1L",        9.90m, "7750001000084", "UND", false, false),
+            ("Abarrotes",  "ABA-001", "Arroz extra 1kg",           4.80m, "7750001000091", "UND", false, false),
+            ("Abarrotes",  "ABA-002", "Azucar rubia 1kg",          4.20m, "7750001000107", "UND", false, false),
+            ("Abarrotes",  "ABA-003", "Queso fresco (por kilo)",  28.00m, "7750001000121", "KG",  false, true)
         };
 
         foreach (var p in seedProducts)
@@ -174,6 +181,7 @@ public static class DbSeeder
                 Unit = p.Unit,
                 Stock = 100,
                 MinStock = 10,
+                SoldByWeight = p.ByWeight,
                 IsProduced = p.Produced,
                 IsActive = true,
                 CreatedByUserId = admin.Id

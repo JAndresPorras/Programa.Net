@@ -655,6 +655,9 @@ namespace Pos.Web.Data.Migrations.Sqlite
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("INTEGER");
 
+                    b.Property<double>("RoundingAdjustment")
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<DateTime>("SoldAt")
                         .HasColumnType("TEXT");
 

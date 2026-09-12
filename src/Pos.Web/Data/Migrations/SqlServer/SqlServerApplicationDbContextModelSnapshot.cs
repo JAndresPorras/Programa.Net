@@ -688,6 +688,9 @@ namespace Pos.Web.Data.Migrations.SqlServer
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("int");
 
+                    b.Property<decimal>("RoundingAdjustment")
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<DateTime>("SoldAt")
                         .HasColumnType("datetime2");
 

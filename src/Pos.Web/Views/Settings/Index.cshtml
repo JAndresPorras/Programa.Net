@@ -44,15 +44,41 @@
                     </div>
                     <span asp-validation-for="CurrencyCode" class="text-danger"></span>
 
-                    <div class="alert alert-info mt-3 mb-0">
+                    <div class="alert alert-info mt-3">
                         <svg class="icon"><use href="#i-info"></use></svg>
                         <div>
                             Moneda actual: <b>@current.Name</b>. Ejemplo de importe:
                             <b class="money">@current.Format(1234.5m)</b> &middot;
-                            @current.Decimals decimales &middot; vuelto redondeado a
+                            @current.Decimals decimales &middot; moneda más pequeña
                             <b>@current.Format(current.CashRounding)</b>.
                             <br />
                             Las ventas ya cerradas conservan la moneda con la que se cobraron.
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="form-check mb-3">
+                        <input asp-for="PriceCashSteps" class="form-check-input" />
+                        <label asp-for="PriceCashSteps" class="form-check-label">
+                            Exigir precios que se puedan pagar exactos
+                        </label>
+                        <div class="form-hint">
+                            No deja guardar precios como @current.Format(4.17m), que obligan a perder
+                            monedas en cada venta. Al escribir el precio el sistema avisa cuánto subir
+                            o bajar para llegar al múltiplo de @current.Format(current.CashRounding).
+                        </div>
+                    </div>
+
+                    <div class="form-check">
+                        <input asp-for="TotalCashRounding" class="form-check-input" />
+                        <label asp-for="TotalCashRounding" class="form-check-label">
+                            Redondear el total al efectivo
+                        </label>
+                        <div class="form-hint">
+                            Si por un pesaje o un descuento el total queda en @current.Format(33.04m),
+                            se cobra @current.Format(current.RoundCash(33.04m)) y el ajuste sale
+                            detallado en el recibo.
                         </div>
                     </div>
                 </div>

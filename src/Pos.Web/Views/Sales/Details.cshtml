@@ -111,6 +111,13 @@
                         <span class="text-soft">@s.TaxName</span><b class="money">@c.Format(Model.TaxAmount)</b>
                     </div>
                 }
+                @if (Model.RoundingAdjustment != 0)
+                {
+                    <div class="pay__row d-flex justify-content-between mb-1">
+                        <span class="text-soft">Redondeo al efectivo</span>
+                        <b class="money">@(Model.RoundingAdjustment > 0 ? "+" : "")@c.Format(Model.RoundingAdjustment)</b>
+                    </div>
+                }
                 <div class="divider"></div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="fw-bold text-uppercase fs-12 text-soft">Total</span>

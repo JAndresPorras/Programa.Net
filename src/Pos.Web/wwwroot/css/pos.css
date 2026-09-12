@@ -203,3 +203,30 @@
     .pos__right { border-left: none; border-top: 1px solid var(--line); }
     .ticket { min-height: 320px; }
 }
+
+/* ------------------------------------------------- Pesaje del producto -- */
+.weigh-head {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--canvas);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+}
+.weigh-name { font-size: 15px; font-weight: 700; line-height: 1.25; }
+.weigh-meta { font-size: 12px; color: var(--ink-muted); font-family: var(--font-num); }
+
+/* Peso de cada línea del ticket, se presiona para corregirlo. */
+.weight-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--surface);
+    padding: 5px 12px;
+    font-family: var(--font-num);
+    font-weight: 700;
+    font-size: 13.5px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: .12s;
+}
+.weight-chip:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
+.weight-chip .icon { width: 1em; height: 1em; opacity: .65; }

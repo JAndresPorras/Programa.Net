@@ -31,6 +31,9 @@ public static class SettingKeys
     public const string PrinterOpenDrawer = "printer.drawer";
     public const string PrinterCharsPerLine = "printer.charsperline";
 
+    public const string PriceCashSteps = "price.cashsteps";
+    public const string TotalCashRounding = "total.cashrounding";
+
     public const string PosDefaultOpeningFloat = "pos.openingfloat";
     public const string PosStockControl = "pos.stockcontrol";
     public const string TimeZone = "app.timezone";
@@ -56,6 +59,12 @@ public class PosSettings
     public bool ReceiptPrintAuto { get; set; } = true;
     public int ReceiptCopies { get; set; } = 1;
 
+    /// <summary>Exige que el precio que paga el cliente se pueda pagar con las monedas que existen.</summary>
+    public bool PriceCashSteps { get; set; } = true;
+
+    /// <summary>Redondea el total de la venta al efectivo, para no perder los centimos sueltos.</summary>
+    public bool TotalCashRounding { get; set; } = true;
+
     public string PrinterMode { get; set; } = "browser";
     public string PrinterHost { get; set; } = "192.168.1.100";
     public int PrinterPort { get; set; } = 9100;
@@ -68,6 +77,31 @@ public class PosSettings
     public string TimeZone { get; set; } = "America/Lima";
 
     public CurrencyInfo Currency => CurrencyInfo.Get(CurrencyCode);
+
+    /// <summary>Verdadero cuando el impuesto se suma sobre el precio en lugar de venir incluido.</summary>
+    public bool TaxAddedOnTop => TaxEnabled && TaxRate > 0 && !TaxIncluded;
+
+    /// <summary>
+    /// Precio que realmente paga el cliente en el mostrador. Si el impuesto ya viene
+    /// incluido en el precio es el mismo; si se suma aparte, lo agrega.
+    /// </summary>
+    public decimal PublicPrice(decimal price) =>
+        TaxAddedOnTop ? Currency.Round(price * (1 + TaxRate / 100m)) : Currency.Round(price);
+
+    /// <summary>Precio base que hay que cargar para que el cliente pague el importe indicado.</summary>
+    public decimal BasePriceFor(decimal publicPrice) =>
+        TaxAddedOnTop
+            ? Math.Round(publicPrice / (1 + TaxRate / 100m), 4, MidpointRounding.AwayFromZero)
+            : Currency.Round(publicPrice);
+
+    /// <summary>Impuesto contenido en el precio al publico (o agregado sobre el precio base).</summary>
+    public decimal TaxOf(decimal price)
+    {
+        if (!TaxEnabled || TaxRate <= 0) return 0m;
+        return TaxAddedOnTop
+            ? Currency.Round(price * TaxRate / 100m)
+            : Currency.Round(price - price / (1 + TaxRate / 100m));
+    }
 }
 
 public interface ISettingsService
@@ -119,6 +153,8 @@ public class SettingsService(IServiceScopeFactory scopeFactory, ILogger<Settings
             s.ReceiptSeries = Str(map, SettingKeys.ReceiptSeries, s.ReceiptSeries);
             s.ReceiptPrintAuto = Bool(map, SettingKeys.ReceiptPrintAuto, s.ReceiptPrintAuto);
             s.ReceiptCopies = Int(map, SettingKeys.ReceiptCopies, s.ReceiptCopies);
+            s.PriceCashSteps = Bool(map, SettingKeys.PriceCashSteps, s.PriceCashSteps);
+            s.TotalCashRounding = Bool(map, SettingKeys.TotalCashRounding, s.TotalCashRounding);
             s.PrinterMode = Str(map, SettingKeys.PrinterMode, s.PrinterMode);
             s.PrinterHost = Str(map, SettingKeys.PrinterHost, s.PrinterHost);
             s.PrinterPort = Int(map, SettingKeys.PrinterPort, s.PrinterPort);
@@ -163,6 +199,8 @@ public class SettingsService(IServiceScopeFactory scopeFactory, ILogger<Settings
             [SettingKeys.ReceiptSeries] = s.ReceiptSeries,
             [SettingKeys.ReceiptPrintAuto] = s.ReceiptPrintAuto.ToString(),
             [SettingKeys.ReceiptCopies] = s.ReceiptCopies.ToString(),
+            [SettingKeys.PriceCashSteps] = s.PriceCashSteps.ToString(),
+            [SettingKeys.TotalCashRounding] = s.TotalCashRounding.ToString(),
             [SettingKeys.PrinterMode] = s.PrinterMode,
             [SettingKeys.PrinterHost] = s.PrinterHost,
             [SettingKeys.PrinterPort] = s.PrinterPort.ToString(),

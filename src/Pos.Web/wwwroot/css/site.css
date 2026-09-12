@@ -484,6 +484,61 @@ kbd {
 .till-bar--open { background: var(--success-light); border-color: #a7f3d0; color: #065f46; }
 .till-bar a { color: inherit; font-weight: 700; text-decoration: underline; }
 
+/* ------------------------------------- Precio al público y monedas ------ */
+/* Lo que realmente paga el cliente, al lado del precio de venta. */
+.public-price {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--canvas);
+    padding: 9px 12px;
+    font-size: 17px;
+    font-weight: 700;
+    font-family: var(--font-num);
+    color: var(--success);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Aviso con cuánto subir o bajar el precio para que se pueda pagar exacto. */
+.coin-hint {
+    background: var(--warning-light);
+    border: 1px solid #fde68a;
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+}
+.coin-hint__text { display: flex; gap: 8px; align-items: flex-start;
+                   font-size: 12.5px; color: #92400e; line-height: 1.5; }
+.coin-hint__text .icon { flex: none; margin-top: 2px; }
+.coin-hint__actions { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
+
+.coin-btn {
+    flex: 1 1 auto;
+    border: 1px solid #d97706;
+    background: var(--surface);
+    color: #92400e;
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-num);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: .12s;
+}
+.coin-btn:hover { background: #d97706; color: #fff; }
+
+.coin-ok {
+    display: flex; gap: 8px; align-items: center;
+    font-size: 12.5px; color: #065f46;
+    background: var(--success-light);
+    border: 1px solid #a7f3d0;
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+}
+.coin-ok .icon { flex: none; }
+
 /* ---------------------------------------------------------- Utilidades --- */
 .divider { height: 1px; background: var(--line); margin: 16px 0; }
 .text-muted-x { color: var(--ink-muted); }

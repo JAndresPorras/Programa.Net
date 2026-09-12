@@ -49,6 +49,13 @@ public class Sale
     [Column(TypeName = "decimal(18,4)")]
     public decimal TaxAmount { get; set; }
 
+    /// <summary>
+    /// Ajuste por redondeo al efectivo. Si el total daba S/ 33.04 y no existen
+    /// monedas de un centimo, se guarda -0.04 y el cliente paga S/ 33.00.
+    /// </summary>
+    [Column(TypeName = "decimal(18,4)")]
+    public decimal RoundingAdjustment { get; set; }
+
     [Column(TypeName = "decimal(18,4)")]
     public decimal Total { get; set; }
 

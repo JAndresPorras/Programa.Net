@@ -10,6 +10,11 @@ public class CartStateDto
     public decimal Subtotal { get; set; }
     public decimal Discount { get; set; }
     public decimal Total { get; set; }
+
+    /// <summary>Ajuste por redondeo al efectivo aplicado al total.</summary>
+    public decimal Rounding { get; set; }
+    public string RoundingText { get; set; } = string.Empty;
+
     public decimal Units { get; set; }
     public int LineCount { get; set; }
     public string SubtotalText { get; set; } = string.Empty;
@@ -17,21 +22,32 @@ public class CartStateDto
     public string TotalText { get; set; } = string.Empty;
     public List<QuickAmountDto> QuickAmounts { get; set; } = [];
 
-    public static CartStateDto From(Cart cart, CurrencyInfo currency) => new()
+    public static CartStateDto From(Cart cart, CurrencyInfo currency, bool roundTotalToCash)
     {
-        Lines = cart.Lines.Select(l => CartLineDto.From(l, currency)).ToList(),
-        Subtotal = currency.Round(cart.Subtotal),
-        Discount = currency.Round(cart.DiscountAmount),
-        Total = currency.Round(cart.Total),
-        Units = cart.TotalItems,
-        LineCount = cart.Lines.Count,
-        SubtotalText = currency.Format(cart.Subtotal),
-        DiscountText = currency.Format(cart.DiscountAmount),
-        TotalText = currency.Format(cart.Total),
-        QuickAmounts = currency.QuickAmounts(currency.Round(cart.Total))
-            .Select(a => new QuickAmountDto { Value = a, Text = currency.Format(a) })
-            .ToList()
-    };
+        // Igual que al cerrar la venta: se suman las lineas ya redondeadas.
+        var subtotal = currency.Round(cart.Lines.Sum(l => currency.Round(l.LineTotal)));
+        var discount = currency.Round(cart.DiscountAmount);
+        var total = currency.Round(subtotal - discount);
+        var rounded = roundTotalToCash ? currency.RoundCashTotal(total) : total;
+
+        return new CartStateDto
+        {
+            Lines = cart.Lines.Select(l => CartLineDto.From(l, currency)).ToList(),
+            Subtotal = subtotal,
+            Discount = discount,
+            Total = rounded,
+            Rounding = currency.Round(rounded - total),
+            RoundingText = currency.Format(currency.Round(rounded - total)),
+            Units = cart.TotalItems,
+            LineCount = cart.Lines.Count,
+            SubtotalText = currency.Format(subtotal),
+            DiscountText = currency.Format(discount),
+            TotalText = currency.Format(rounded),
+            QuickAmounts = currency.QuickAmounts(rounded)
+                .Select(a => new QuickAmountDto { Value = a, Text = currency.Format(a) })
+                .ToList()
+        };
+    }
 }
 
 public class QuickAmountDto
@@ -70,7 +86,9 @@ public class CartLineDto
         ImagePath = l.ImagePath,
         UnitPriceText = currency.Format(l.UnitPrice),
         LineTotalText = currency.Format(l.LineTotal),
-        QuantityText = EscPosPrinter.FormatQuantity(l.Quantity)
+        QuantityText = l.SoldByWeight
+            ? l.Quantity.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)
+            : EscPosPrinter.FormatQuantity(l.Quantity)
     };
 }
 
@@ -101,7 +119,11 @@ public class PosIndexViewModel
     public decimal DefaultOpeningFloat { get; set; }
 }
 
-public record ScanRequest(string? Barcode, decimal Quantity = 1);
+/// <summary>
+/// Lectura de la pistola. La cantidad viaja vacia cuando la cajera solo disparo
+/// el codigo: si el producto se vende por peso, el POS le pide los kilos.
+/// </summary>
+public record ScanRequest(string? Barcode, decimal? Quantity = null);
 public record QuantityRequest(int ProductId, decimal Quantity);
 public record ProductRequest(int ProductId, decimal Quantity = 1);
 public record DiscountRequest(decimal Amount);

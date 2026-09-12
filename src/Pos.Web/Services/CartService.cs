@@ -53,6 +53,15 @@ public class CartService(IHttpContextAccessor accessor) : ICartService
 {
     private const string SessionKey = "pos.cart";
 
+    /// <summary>Peso maximo por linea: 2 enteros y 3 decimales.</summary>
+    public const decimal MaxWeight = 99.999m;
+
+    /// <summary>Ajusta la cantidad al formato de la linea: kilos con 3 decimales o unidades enteras.</summary>
+    internal static decimal Normalize(decimal quantity, bool soldByWeight) =>
+        soldByWeight
+            ? Math.Clamp(Math.Round(quantity, 3, MidpointRounding.AwayFromZero), 0m, MaxWeight)
+            : Math.Max(0m, Math.Round(quantity, 0, MidpointRounding.AwayFromZero));
+
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = null };
 
     private ISession Session =>
@@ -93,7 +102,7 @@ public class CartService(IHttpContextAccessor accessor) : ICartService
                 CategoryName = product.Category?.Name ?? string.Empty,
                 ScannedBarcode = scannedBarcode,
                 UnitPrice = product.Price,
-                Quantity = quantity,
+                Quantity = Normalize(quantity, product.SoldByWeight),
                 Unit = product.Unit,
                 SoldByWeight = product.SoldByWeight,
                 ImagePath = product.ImagePath
@@ -102,8 +111,8 @@ public class CartService(IHttpContextAccessor accessor) : ICartService
         }
         else
         {
-            // Volver a escanear el mismo codigo suma una unidad mas.
-            line.Quantity += quantity;
+            // Volver a escanear el mismo codigo suma una unidad mas, o un pesaje mas.
+            line.Quantity = Normalize(line.Quantity + quantity, product.SoldByWeight);
             line.UnitPrice = product.Price;
         }
 
@@ -123,7 +132,7 @@ public class CartService(IHttpContextAccessor accessor) : ICartService
         }
         else
         {
-            line.Quantity = line.SoldByWeight ? Math.Round(quantity, 3) : Math.Round(quantity, 0);
+            line.Quantity = Normalize(quantity, line.SoldByWeight);
         }
 
         Save(cart);

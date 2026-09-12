@@ -32,7 +32,7 @@ public class PosController(
 
         return View(new PosIndexViewModel
         {
-            Cart = CartStateDto.From(cart.Get(), config.Currency),
+            Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
             Currency = config.Currency,
             OpenSession = await cashSessions.GetOpenSessionAsync(userId),
             CanDiscount = User.HasPermission(Permissions.PosDiscount),
@@ -77,20 +77,46 @@ public class PosController(
             return Json(PosResponse.Fail($"{product.Name} está desactivado y no se puede vender."));
         }
 
+        // Producto que se vende pesado y la cajera solo disparo el codigo:
+        // el punto de venta le pide los kilos antes de agregarlo al ticket.
+        if (product.SoldByWeight && request.Quantity is null)
+        {
+            return Json(new PosResponse
+            {
+                Success = true,
+                Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
+                Data = new
+                {
+                    needsWeight = true,
+                    product = new
+                    {
+                        id = product.Id,
+                        code = product.Code,
+                        name = product.Name,
+                        unit = product.Unit,
+                        price = product.Price,
+                        priceText = config.Currency.Format(product.Price),
+                        inCart = cart.Get().Lines.FirstOrDefault(l => l.ProductId == product.Id)?.Quantity ?? 0
+                    }
+                }
+            });
+        }
+
+        var quantity = request.Quantity is null or <= 0 ? 1m : request.Quantity.Value;
+
         if (config.PosStockControl)
         {
             var inCart = cart.Get().Lines.FirstOrDefault(l => l.ProductId == product.Id)?.Quantity ?? 0;
-            if (inCart + request.Quantity > product.Stock)
+            if (inCart + quantity > product.Stock)
             {
                 return Json(PosResponse.Fail(
                     $"No hay stock suficiente de {product.Name}. Disponible: {EscPosPrinter.FormatQuantity(product.Stock)}."));
             }
         }
 
-        var quantity = request.Quantity <= 0 ? 1 : request.Quantity;
         var line = cart.AddProduct(product, quantity, barcode?.Code ?? code);
 
-        var state = CartStateDto.From(cart.Get(), config.Currency);
+        var state = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding);
         return Json(new PosResponse
         {
             Success = true,
@@ -116,7 +142,7 @@ public class PosController(
         return Json(new PosResponse
         {
             Success = true,
-            Cart = CartStateDto.From(cart.Get(), config.Currency),
+            Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
             Message = $"{product.Name} agregado",
             MessageKind = "success",
             Data = new { addedProductId = line.ProductId }
@@ -132,7 +158,7 @@ public class PosController(
         {
             return Json(PosResponse.Fail("La línea ya no está en el ticket."));
         }
-        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency)));
+        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding)));
     }
 
     [HttpPost]
@@ -141,7 +167,7 @@ public class PosController(
     {
         var config = await settings.GetAsync();
         cart.Remove(request.ProductId);
-        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency)));
+        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding)));
     }
 
     [HttpPost]
@@ -150,7 +176,7 @@ public class PosController(
     {
         var config = await settings.GetAsync();
         cart.Clear();
-        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency), "Ticket vaciado"));
+        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding), "Ticket vaciado"));
     }
 
     [HttpPost]
@@ -169,7 +195,7 @@ public class PosController(
 
         current.DiscountAmount = config.Currency.Round(amount);
         cart.Save(current);
-        return Json(PosResponse.Ok(CartStateDto.From(current, config.Currency), "Descuento aplicado"));
+        return Json(PosResponse.Ok(CartStateDto.From(current, config.Currency, config.TotalCashRounding), "Descuento aplicado"));
     }
 
     /// <summary>Búsqueda de productos para vender artículos sin código de barras a la mano.</summary>
@@ -255,7 +281,7 @@ public class PosController(
         return Json(new PosResponse
         {
             Success = true,
-            Cart = CartStateDto.From(cart.Get(), config.Currency),
+            Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
             Message = $"Venta {result.Sale.Number} cerrada",
             MessageKind = "success",
             Data = new

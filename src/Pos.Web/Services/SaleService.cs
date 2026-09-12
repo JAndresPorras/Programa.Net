@@ -64,7 +64,9 @@ public class SaleService(
         var config = await settings.GetAsync(ct);
         var currency = config.Currency;
 
-        var subtotal = currency.Round(cart.Lines.Sum(l => l.LineTotal));
+        // Se suman las lineas ya redondeadas para que el ticket impreso cuadre
+        // exactamente con la suma que ve el cliente linea por linea.
+        var subtotal = currency.Round(cart.Lines.Sum(l => currency.Round(l.LineTotal)));
         var discount = currency.Round(Math.Max(0, request.DiscountAmount));
         if (discount > subtotal) return CheckoutResult.Fail("El descuento no puede ser mayor que el subtotal.");
 
@@ -77,6 +79,17 @@ public class SaleService(
                 ? currency.Round(total - total / (1 + config.TaxRate / 100m))
                 : currency.Round(total * config.TaxRate / 100m);
             if (!config.TaxIncluded) total = currency.Round(total + tax);
+        }
+
+        // Un total de S/ 33.04 no se puede cobrar porque no existen monedas de
+        // un centimo: se ajusta al multiplo de moneda mas cercano y el ajuste
+        // queda registrado y se imprime en el recibo.
+        decimal roundingAdjustment = 0m;
+        if (config.TotalCashRounding)
+        {
+            var rounded = currency.RoundCashTotal(total);
+            roundingAdjustment = currency.Round(rounded - total);
+            total = rounded;
         }
 
         var received = currency.Round(request.AmountReceived);
@@ -106,6 +119,7 @@ public class SaleService(
                 Subtotal = subtotal,
                 DiscountAmount = discount,
                 TaxAmount = tax,
+                RoundingAdjustment = roundingAdjustment,
                 Total = total,
                 AmountReceived = request.PaymentMethod == PaymentMethod.Cash ? received : total,
                 ChangeGiven = change,

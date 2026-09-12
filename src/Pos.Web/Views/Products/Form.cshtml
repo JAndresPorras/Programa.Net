@@ -1,9 +1,14 @@
 @model ProductFormViewModel
 @inject ISettingsService SettingsService
 @{
-    var c = SettingsService.Current.Currency;
+    var cfg = SettingsService.Current;
+    var c = cfg.Currency;
     var isEdit = Model.Id > 0;
     var step = c.Decimals == 0 ? "1" : "0.01";
+
+    // El precio acepta cualquier decimal: el limite de moneda lo explica nuestro
+    // propio aviso en espanol y lo comprueba el servidor, en lugar del mensaje
+    // generico que muestra el navegador con el atributo step.
 }
 
 <div class="page-head">
@@ -27,7 +32,7 @@
          style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
 
     <div class="row g-3">
-        <div class="col-lg-8">
+        <div class="col-lg-7">
             <div class="card-x mb-3">
                 <div class="card-x__head">
                     <svg class="icon" style="color:var(--primary)"><use href="#i-box"></use></svg>
@@ -140,28 +145,58 @@
             }
         </div>
 
-        <div class="col-lg-4">
+        <div class="col-lg-5">
             <div class="card-x mb-3">
                 <div class="card-x__head">
                     <svg class="icon" style="color:var(--success)"><use href="#i-coins"></use></svg>
                     <h2 class="card-x__title">Precio y stock</h2>
                 </div>
                 <div class="card-x__body">
-                    <div class="mb-3">
-                        <label asp-for="Price" class="form-label"></label>
-                        <div class="input-group">
-                            <span class="input-group-text">@c.Symbol</span>
-                            <input asp-for="Price" class="form-control" type="number" step="@step" min="0"
-                                   id="priceInput" disabled="@(!Model.CanChangePrice)" />
-                        </div>
-                        <span asp-validation-for="Price" class="text-danger"></span>
-                        @if (!Model.CanChangePrice)
-                        {
-                            <div class="form-hint text-danger">
-                                No tiene el permiso «Cambiar precios». El precio se mantendrá sin cambios.
+                    <div class="row g-2">
+                        <div class="col-7">
+                            <label asp-for="Price" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text">@c.Symbol</span>
+                                <input asp-for="Price" class="form-control" type="number" step="any" min="0"
+                                       id="priceInput" disabled="@(!Model.CanChangePrice)" />
                             </div>
-                        }
+                        </div>
+                        <div class="col-5">
+                            @* Lo que termina pagando el cliente en el mostrador. *@
+                            <label class="form-label" for="publicPrice">Precio al público</label>
+                            <div class="public-price" id="publicPrice">@c.Format(cfg.PublicPrice(Model.Price))</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-hint" id="publicPriceNote"></div>
+                            <span asp-validation-for="Price" class="text-danger"></span>
+                            @if (!Model.CanChangePrice)
+                            {
+                                <div class="form-hint text-danger">
+                                    No tiene el permiso «Cambiar precios». El precio se mantendrá sin cambios.
+                                </div>
+                            }
+                        </div>
                     </div>
+
+                    @* Aviso que dice exactamente cuánto subir o bajar para que el
+                       precio se pueda pagar con las monedas que existen. *@
+                    <div class="coin-hint mt-2" id="coinHint" style="display:none">
+                        <div class="coin-hint__text">
+                            <svg class="icon"><use href="#i-alert"></use></svg>
+                            <span id="coinHintText"></span>
+                        </div>
+                        <div class="coin-hint__actions">
+                            <button type="button" class="coin-btn" id="coinDown"></button>
+                            <button type="button" class="coin-btn" id="coinUp"></button>
+                        </div>
+                    </div>
+
+                    <div class="coin-ok mt-2" id="coinOk" style="display:none">
+                        <svg class="icon"><use href="#i-check-circle"></use></svg>
+                        <span id="coinOkText"></span>
+                    </div>
+
+                    <div class="mb-3"></div>
 
                     @if (isEdit && Model.CanChangePrice)
                     {
@@ -192,6 +227,32 @@
                             <label asp-for="MinStock" class="form-label"></label>
                             <input asp-for="MinStock" class="form-control" type="number" step="0.001" />
                         </div>
+                    </div>
+                </div>
+
+                @* Solo tiene sentido cuando el producto se marca como vendido por peso. *@
+                <div class="card-x__foot" id="weightCalc" style="display:none">
+                    <div class="fs-11 text-uppercase fw-bold text-muted-x mb-2" style="letter-spacing:.06em">
+                        Calculadora de peso
+                    </div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6">
+                            <label class="form-label" for="weightSample">Peso a cobrar</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="weightSample"
+                                       min="0" max="99.999" step="0.001" value="1.000"
+                                       inputmode="decimal" placeholder="0.000" />
+                                <span class="input-group-text" id="weightUnit">KG</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" for="weightResult">Se le cobra</label>
+                            <div class="public-price" id="weightResult">@c.Format(0)</div>
+                        </div>
+                    </div>
+                    <div class="form-hint mt-2" id="weightNote">
+                        Hasta 2 enteros y 3 decimales (máximo 99.999). En el punto de venta la
+                        cajera escribe el peso y el sistema calcula el importe.
                     </div>
                 </div>
             </div>
@@ -243,18 +304,206 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        // Pide el motivo sólo cuando efectivamente cambió el precio.
         (function () {
+            var cfg = {
+                symbol: '@c.Symbol',
+                decimals: @c.Decimals,
+                coin: @c.CashRounding.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                currencyName: '@c.Name',
+                enforceCoins: @cfg.PriceCashSteps.ToString().ToLowerInvariant(),
+                taxEnabled: @((cfg.TaxEnabled && cfg.TaxRate > 0).ToString().ToLowerInvariant()),
+                taxOnTop: @cfg.TaxAddedOnTop.ToString().ToLowerInvariant(),
+                taxRate: @cfg.TaxRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                taxName: '@cfg.TaxName'
+            };
+
             var price = document.getElementById('priceInput');
-            var block = document.getElementById('reasonBlock');
-            if (!price || !block) { return; }
-            var original = parseFloat(document.querySelector('[name="OriginalPrice"]').value || '0');
-            function check() {
-                var now = parseFloat(price.value || '0');
-                block.style.display = (now !== original) ? '' : 'none';
+            var publicPrice = document.getElementById('publicPrice');
+            var publicNote = document.getElementById('publicPriceNote');
+            var coinHint = document.getElementById('coinHint');
+            var coinHintText = document.getElementById('coinHintText');
+            var coinDown = document.getElementById('coinDown');
+            var coinUp = document.getElementById('coinUp');
+            var coinOk = document.getElementById('coinOk');
+            var coinOkText = document.getElementById('coinOkText');
+            var reasonBlock = document.getElementById('reasonBlock');
+            var originalField = document.querySelector('[name="OriginalPrice"]');
+
+            function money(v) {
+                var parts = Number(v || 0).toFixed(cfg.decimals).split('.');
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                return cfg.symbol + ' ' + parts.join('.');
             }
-            price.addEventListener('input', check);
-            check();
+
+            /* Precio que termina pagando el cliente. */
+            function toPublic(base) {
+                return cfg.taxOnTop ? base * (1 + cfg.taxRate / 100) : base;
+            }
+
+            /* Precio que hay que cargar para que el cliente pague ese importe. */
+            function toBase(pub) {
+                return cfg.taxOnTop ? pub / (1 + cfg.taxRate / 100) : pub;
+            }
+
+            /* Monedas vecinas, en aritmetica entera para no arrastrar decimales sueltos. */
+            function nearestCoin(value) {
+                if (!(cfg.coin > 0)) { return { down: value, up: value, exact: true }; }
+                var scale = 1000000;
+                var v = Math.round(value * scale);
+                var coin = Math.round(cfg.coin * scale);
+                var q = Math.floor(v / coin);
+                var exact = (v % coin) === 0;
+                return {
+                    down: (q * coin) / scale,
+                    up: exact ? value : ((q + 1) * coin) / scale,
+                    exact: exact
+                };
+            }
+
+            function refresh() {
+                var base = parseFloat(price.value || '0');
+                if (isNaN(base) || base < 0) { base = 0; }
+
+                var pub = Number(toPublic(base).toFixed(cfg.decimals));
+                publicPrice.textContent = money(pub);
+
+                /* Detalle del impuesto debajo del precio al publico. */
+                if (!cfg.taxEnabled) {
+                    publicNote.textContent = 'Sin impuesto configurado: es el mismo precio de venta.';
+                } else if (cfg.taxOnTop) {
+                    publicNote.textContent = money(base) + ' + ' + cfg.taxName + ' ' + cfg.taxRate +
+                                             '% (' + money(pub - base) + ')';
+                } else {
+                    var net = base / (1 + cfg.taxRate / 100);
+                    publicNote.textContent = 'Incluye ' + cfg.taxName + ' ' + cfg.taxRate + '% (' +
+                                             money(base - net) + ') · neto ' + money(net);
+                }
+
+                if (!cfg.enforceCoins || base <= 0) {
+                    coinHint.style.display = 'none';
+                    coinOk.style.display = 'none';
+                    return;
+                }
+
+                var near = nearestCoin(pub);
+                if (near.exact) {
+                    coinHint.style.display = 'none';
+                    coinOk.style.display = '';
+                    coinOkText.textContent = money(pub) + ' se puede pagar exacto con las monedas que existen.';
+                } else {
+                    coinOk.style.display = 'none';
+                    coinHint.style.display = '';
+
+                    var down = pub - near.down;
+                    var up = near.up - pub;
+
+                    coinHintText.innerHTML =
+                        '<b>' + money(pub) + ' no se puede pagar exacto.</b> En ' + cfg.currencyName +
+                        ' la moneda más pequeña es ' + money(cfg.coin) + ', así que hay que ' +
+                        '<b>bajar ' + money(down) + '</b> o <b>subir ' + money(up) + '</b>.';
+
+                    coinDown.textContent = '▼ Bajar ' + money(down) + ' → ' + money(near.down);
+                    coinUp.textContent = '▲ Subir ' + money(up) + ' → ' + money(near.up);
+                    coinDown.dataset.target = near.down;
+                    coinUp.dataset.target = near.up;
+                }
+            }
+
+            /* Al presionar una sugerencia se escribe el precio que corresponde. */
+            function applyTarget(button) {
+                var target = parseFloat(button.dataset.target || '0');
+                var base = toBase(target);
+                price.value = cfg.taxOnTop ? base.toFixed(4) : base.toFixed(cfg.decimals);
+                refresh();
+                checkReason();
+                price.focus();
+            }
+
+            /* El motivo solo se pide cuando el precio efectivamente cambió. */
+            function checkReason() {
+                if (!reasonBlock || !originalField) { return; }
+                var original = parseFloat(originalField.value || '0');
+                var now = parseFloat(price.value || '0');
+                reasonBlock.style.display = (now !== original) ? '' : 'none';
+            }
+
+            if (price) {
+                price.addEventListener('input', function () { refresh(); checkReason(); });
+
+                [coinDown, coinUp].forEach(function (button) {
+                    // Sin esto el boton roba el foco al precio, la validacion inserta
+                    // su mensaje, el boton se corre y el click nunca llega a dispararse.
+                    button.addEventListener('mousedown', function (e) { e.preventDefault(); });
+                    button.addEventListener('click', function () { applyTarget(button); });
+                });
+
+                refresh();
+                checkReason();
+
+                // No se guarda un precio que no se pueda cobrar con monedas reales.
+                var form = price.closest('form');
+                if (form) {
+                    form.addEventListener('submit', function (e) {
+                        if (!cfg.enforceCoins) { return; }
+                        var base = parseFloat(price.value || '0');
+                        if (isNaN(base) || base <= 0) { return; }
+
+                        var pub = Number(toPublic(base).toFixed(cfg.decimals));
+                        if (nearestCoin(pub).exact) { return; }
+
+                        e.preventDefault();
+                        refresh();
+                        coinHint.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                        price.focus();
+                        if (window.posToast) {
+                            window.posToast('Ajuste el precio a un monto que se pueda pagar exacto.', 'danger');
+                        }
+                    });
+                }
+            }
+
+            /* ---------------- Calculadora de peso ---------------- */
+            var byWeight = document.getElementById('SoldByWeight');
+            var unitSelect = document.getElementById('Unit');
+            var weightCalc = document.getElementById('weightCalc');
+            var weightSample = document.getElementById('weightSample');
+            var weightResult = document.getElementById('weightResult');
+            var weightUnit = document.getElementById('weightUnit');
+
+            function clampWeight() {
+                var raw = parseFloat(weightSample.value || '0');
+                if (isNaN(raw) || raw < 0) { raw = 0; }
+                if (raw > 99.999) { raw = 99.999; }
+                return Math.round(raw * 1000) / 1000;   // 2 enteros y 3 decimales
+            }
+
+            function refreshWeight() {
+                if (!weightCalc) { return; }
+                var on = byWeight && byWeight.checked;
+                weightCalc.style.display = on ? '' : 'none';
+                if (!on) { return; }
+
+                if (unitSelect) { weightUnit.textContent = unitSelect.value || 'KG'; }
+
+                var kilos = clampWeight();
+                var base = parseFloat(price.value || '0');
+                if (isNaN(base)) { base = 0; }
+                var amount = toPublic(base) * kilos;
+
+                weightResult.textContent = money(amount);
+            }
+
+            if (byWeight) {
+                byWeight.addEventListener('change', refreshWeight);
+                if (unitSelect) { unitSelect.addEventListener('change', refreshWeight); }
+                if (price) { price.addEventListener('input', refreshWeight); }
+                weightSample.addEventListener('input', refreshWeight);
+                weightSample.addEventListener('blur', function () {
+                    weightSample.value = clampWeight().toFixed(3);
+                    refreshWeight();
+                });
+                refreshWeight();
+            }
         })();
     </script>
 }
