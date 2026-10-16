@@ -47,6 +47,28 @@
                         </div>
                     </div>
 
+                    <div class="mb-3">
+                        <label asp-for="ParentCategoryId" class="form-label">Categoría principal (opcional)</label>
+                        <select asp-for="ParentCategoryId" class="form-select">
+                            <option value="">— Ninguna: es una categoría principal —</option>
+                            @foreach (var parent in (List<Category>)ViewBag.Parents)
+                            {
+                                <option value="@parent.Id" selected="@(Model.ParentCategoryId == parent.Id)">@parent.Name</option>
+                            }
+                        </select>
+                        <div class="form-hint">Por ejemplo, Yogures y Quesos van dentro de Lácteos.</div>
+                        <span asp-validation-for="ParentCategoryId" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-check mb-3" style="padding:10px 12px 10px 34px;border:1px solid var(--line);border-radius:var(--radius-sm)">
+                        <input asp-for="InventoryEnabled" class="form-check-input" />
+                        <label asp-for="InventoryEnabled" class="form-check-label"><b>Permite inventario personalizado</b></label>
+                        <div class="form-hint">
+                            Sus productos se podrán elegir en la vista Inventario. No activa el control
+                            de ningún producto por sí solo: usted elige cuáles.
+                        </div>
+                    </div>
+
                     <div class="form-check mb-4">
                         <input asp-for="IsActive" class="form-check-input" />
                         <label asp-for="IsActive" class="form-check-label"></label>

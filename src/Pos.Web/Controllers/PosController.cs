@@ -32,7 +32,7 @@ public class PosController(
 
         return View(new PosIndexViewModel
         {
-            Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
+            Cart = await StateAsync(cart.Get(), config),
             Currency = config.Currency,
             OpenSession = await cashSessions.GetOpenSessionAsync(userId),
             CanDiscount = User.HasPermission(Permissions.PosDiscount),
@@ -84,7 +84,7 @@ public class PosController(
             return Json(new PosResponse
             {
                 Success = true,
-                Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
+                Cart = await StateAsync(cart.Get(), config),
                 Data = new
                 {
                     needsWeight = true,
@@ -104,7 +104,9 @@ public class PosController(
 
         var quantity = request.Quantity is null or <= 0 ? 1m : request.Quantity.Value;
 
-        if (config.PosStockControl)
+        // Control de stock global de antes: sigue bloqueando como siempre, pero solo
+        // los productos que no estan en el inventario personalizado.
+        if (config.PosStockControl && !product.TrackInventory)
         {
             var inCart = cart.Get().Lines.FirstOrDefault(l => l.ProductId == product.Id)?.Quantity ?? 0;
             if (inCart + quantity > product.Stock)
@@ -115,16 +117,46 @@ public class PosController(
         }
 
         var line = cart.AddProduct(product, quantity, barcode?.Code ?? code);
+        return Json(await AddedResponseAsync(product, line, config, $"{product.Name} · {config.Currency.Format(product.Price)}"));
+    }
 
-        var state = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding);
-        return Json(new PosResponse
+    /// <summary>
+    /// Respuesta al agregar un producto. Si es del inventario personalizado y lo
+    /// que hay en el ticket supera lo digital, avisa en amarillo pero lo agrega igual.
+    /// </summary>
+    private async Task<PosResponse> AddedResponseAsync(Product product, CartLine line, PosSettings config, string message)
+    {
+        var state = await StateAsync(cart.Get(), config);
+        var shown = state.Lines.FirstOrDefault(l => l.ProductId == product.Id);
+
+        string? warning = null;
+        if (shown is { StockShort: true })
+        {
+            warning = $"Inventario digital de {product.Name}: {shown.StockText} {product.Unit}. " +
+                      "Puede vender igual: al cobrar se ajusta solo.";
+        }
+
+        return new PosResponse
         {
             Success = true,
             Cart = state,
-            Message = $"{product.Name} · {config.Currency.Format(product.Price)}",
-            MessageKind = "success",
-            Data = new { addedProductId = line.ProductId }
-        });
+            Message = warning ?? message,
+            MessageKind = warning is null ? "success" : "warning",
+            Data = new { addedProductId = line.ProductId, inventoryWarning = warning }
+        };
+    }
+
+    /// <summary>Arma el ticket con las existencias digitales de los productos del inventario.</summary>
+    private async Task<CartStateDto> StateAsync(Cart current, PosSettings config)
+    {
+        var ids = current.Lines.Select(l => l.ProductId).ToList();
+        var stock = ids.Count == 0
+            ? new Dictionary<int, decimal>()
+            : await db.Products
+                .Where(p => ids.Contains(p.Id) && p.TrackInventory)
+                .ToDictionaryAsync(p => p.Id, p => p.Stock);
+
+        return CartStateDto.From(current, config.Currency, config.TotalCashRounding, stock);
     }
 
     [HttpPost]
@@ -139,14 +171,7 @@ public class PosController(
         if (product is null) return Json(PosResponse.Fail("El producto no existe o está desactivado."));
 
         var line = cart.AddProduct(product, request.Quantity <= 0 ? 1 : request.Quantity);
-        return Json(new PosResponse
-        {
-            Success = true,
-            Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
-            Message = $"{product.Name} agregado",
-            MessageKind = "success",
-            Data = new { addedProductId = line.ProductId }
-        });
+        return Json(await AddedResponseAsync(product, line, config, $"{product.Name} agregado"));
     }
 
     [HttpPost]
@@ -158,7 +183,7 @@ public class PosController(
         {
             return Json(PosResponse.Fail("La línea ya no está en el ticket."));
         }
-        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding)));
+        return Json(PosResponse.Ok(await StateAsync(cart.Get(), config)));
     }
 
     [HttpPost]
@@ -167,7 +192,7 @@ public class PosController(
     {
         var config = await settings.GetAsync();
         cart.Remove(request.ProductId);
-        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding)));
+        return Json(PosResponse.Ok(await StateAsync(cart.Get(), config)));
     }
 
     [HttpPost]
@@ -176,7 +201,7 @@ public class PosController(
     {
         var config = await settings.GetAsync();
         cart.Clear();
-        return Json(PosResponse.Ok(CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding), "Ticket vaciado"));
+        return Json(PosResponse.Ok(await StateAsync(cart.Get(), config), "Ticket vaciado"));
     }
 
     [HttpPost]
@@ -195,7 +220,7 @@ public class PosController(
 
         current.DiscountAmount = config.Currency.Round(amount);
         cart.Save(current);
-        return Json(PosResponse.Ok(CartStateDto.From(current, config.Currency, config.TotalCashRounding), "Descuento aplicado"));
+        return Json(PosResponse.Ok(await StateAsync(current, config), "Descuento aplicado"));
     }
 
     /// <summary>Búsqueda de productos para vender artículos sin código de barras a la mano.</summary>
@@ -267,7 +292,34 @@ public class PosController(
 
         var result = await sales.CheckoutAsync(current, userId, userName, new CheckoutRequest(
             request.AmountReceived, discount, method,
-            request.CustomerName, request.CustomerDocument, request.Notes));
+            request.CustomerName, request.CustomerDocument, request.Notes,
+            request.ConfirmStockShortage));
+
+        if (result.NeedsStockConfirmation)
+        {
+            return Json(new PosResponse
+            {
+                Success = false,
+                Message = result.Error,
+                MessageKind = "warning",
+                Data = new
+                {
+                    needsStockConfirmation = true,
+                    shortages = result.Shortages.Select(x => new
+                    {
+                        productId = x.ProductId,
+                        name = x.ProductName,
+                        unit = x.Unit,
+                        stock = x.Stock,
+                        quantity = x.Quantity,
+                        missing = x.Missing,
+                        stockText = EscPosPrinter.FormatQuantity(x.Stock),
+                        quantityText = EscPosPrinter.FormatQuantity(x.Quantity),
+                        missingText = EscPosPrinter.FormatQuantity(x.Missing)
+                    })
+                }
+            });
+        }
 
         if (!result.Success || result.Sale is null)
         {
@@ -281,7 +333,7 @@ public class PosController(
         return Json(new PosResponse
         {
             Success = true,
-            Cart = CartStateDto.From(cart.Get(), config.Currency, config.TotalCashRounding),
+            Cart = await StateAsync(cart.Get(), config),
             Message = $"Venta {result.Sale.Number} cerrada",
             MessageKind = "success",
             Data = new

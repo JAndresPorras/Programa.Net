@@ -470,6 +470,9 @@ namespace Pos.Web.Data.Migrations.Sqlite
                         .HasMaxLength(250)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("InventoryEnabled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -478,12 +481,65 @@ namespace Pos.Web.Data.Migrations.Sqlite
                         .HasMaxLength(80)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("ParentCategoryId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique();
 
+                    b.HasIndex("ParentCategoryId");
+
                     b.ToTable("Categories");
+                });
+
+            modelBuilder.Entity("Pos.Web.Models.InventoryMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(250)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Quantity")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int?>("SaleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("StockAfter")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<double>("StockBefore")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("ProductId", "CreatedAt");
+
+                    b.ToTable("InventoryMovements");
                 });
 
             modelBuilder.Entity("Pos.Web.Models.PriceHistory", b =>
@@ -578,6 +634,9 @@ namespace Pos.Web.Data.Migrations.Sqlite
 
                     b.Property<double>("Stock")
                         .HasColumnType("decimal(18,4)");
+
+                    b.Property<bool>("TrackInventory")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -836,6 +895,27 @@ namespace Pos.Web.Data.Migrations.Sqlite
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Pos.Web.Models.Category", b =>
+                {
+                    b.HasOne("Pos.Web.Models.Category", "ParentCategory")
+                        .WithMany("SubCategories")
+                        .HasForeignKey("ParentCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentCategory");
+                });
+
+            modelBuilder.Entity("Pos.Web.Models.InventoryMovement", b =>
+                {
+                    b.HasOne("Pos.Web.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Pos.Web.Models.PriceHistory", b =>
                 {
                     b.HasOne("Pos.Web.Models.ApplicationUser", "ChangedByUser")
@@ -911,6 +991,8 @@ namespace Pos.Web.Data.Migrations.Sqlite
             modelBuilder.Entity("Pos.Web.Models.Category", b =>
                 {
                     b.Navigation("Products");
+
+                    b.Navigation("SubCategories");
                 });
 
             modelBuilder.Entity("Pos.Web.Models.Product", b =>

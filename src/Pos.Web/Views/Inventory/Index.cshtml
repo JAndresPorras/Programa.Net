@@ -1,0 +1,188 @@
+@model InventoryIndexViewModel
+@{
+    ViewData["Title"] = "Inventario";
+    var categorias = string.Join(", ", Model.EligibleCategories.Select(c => c.FullName));
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/inventory.css" asp-append-version="true" />
+}
+
+<div class="page-head">
+    <div>
+        <h1>Inventario</h1>
+        <p>
+            Elija qué productos controlar y registre sus cantidades cuando lo necesite.
+            Las ventas los descuentan solas y <b>nunca se bloquean</b> por falta de existencias digitales.
+        </p>
+    </div>
+    <div class="page-head__actions">
+        <a class="btn btn-soft" asp-action="Excel" id="btnExcel">
+            <svg class="icon"><use href="#i-download"></use></svg> Exportar a Excel
+        </a>
+    </div>
+</div>
+
+@if (Model.EligibleCategories.Count == 0)
+{
+    <div class="card-x">
+        <div class="empty">
+            <svg class="icon"><use href="#i-tag"></use></svg>
+            <p>
+                <b>Ninguna categoría tiene habilitado el inventario.</b><br />
+                Marque «Permite inventario personalizado» en las categorías que quiera controlar
+                (por ejemplo Yogures y Quesos, dentro de Lácteos).
+            </p>
+            @if (Model.CanManageCategories)
+            {
+                <a class="btn btn-primary mt-3" asp-controller="Categories" asp-action="Index">Ir a categorías</a>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        <!-- ======================================== Productos controlados -->
+        <div class="col-xl-8">
+            <div class="card-x mb-3">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--primary)"><use href="#i-box"></use></svg>
+                    <h2 class="card-x__title">Productos que controla</h2>
+                    <span class="chip ms-auto" id="trackedCount">@Model.Rows.Count</span>
+                </div>
+
+                <div class="card-x__body pb-2">
+                    <!-- Que hace la cantidad que se escribe: es lo que evita errores. -->
+                    <div class="inv-mode" role="radiogroup" aria-label="Qué hace la cantidad que escribe">
+                        <button type="button" class="inv-mode__btn inv-mode__btn--entry is-active"
+                                data-mode="entry" role="radio" aria-checked="true">
+                            <span class="inv-mode__icon"><svg class="icon icon-lg"><use href="#i-plus"></use></svg></span>
+                            <span>
+                                <b>Entrada</b>
+                                <span class="inv-mode__what">Suma a lo que hay</span>
+                                <small>Hay 5, llegan 10 → quedan 15</small>
+                            </span>
+                        </button>
+                        <button type="button" class="inv-mode__btn inv-mode__btn--set"
+                                data-mode="set" role="radio" aria-checked="false">
+                            <span class="inv-mode__icon"><svg class="icon icon-lg"><use href="#i-edit"></use></svg></span>
+                            <span>
+                                <b>Editar cantidad</b>
+                                <span class="inv-mode__what">Reemplaza por lo contado</span>
+                                <small>Hay 5, cuenta 10 → quedan 10</small>
+                            </span>
+                        </button>
+                    </div>
+                    <div class="inv-mode__hint" id="modeHint"></div>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table-x inv-table inv-table--entry" id="invTable">
+                        <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th class="t-right">En sistema</th>
+                            <th class="inv-col-input" id="inputHeader">Llegan (se suman)</th>
+                            <th class="t-right">Queda</th>
+                            <th>Última actualización</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="invBody"></tbody>
+                    </table>
+                    <div class="empty" id="invEmpty" style="display:none">
+                        <svg class="icon"><use href="#i-box"></use></svg>
+                        <p>Todavía no eligió productos. Búsquelos a la derecha y agréguelos.</p>
+                    </div>
+                </div>
+
+                <div class="card-x__foot">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="invNote" maxlength="250"
+                                   placeholder="Nota opcional (ej. llegada del proveedor, conteo del lunes)" />
+                        </div>
+                        <div class="col-md-6 d-flex gap-2 justify-content-md-end">
+                            <button type="button" class="btn btn-soft" id="btnClearInputs">Limpiar</button>
+                            <button type="button" class="btn btn-success inv-save" id="btnSave" disabled>
+                                <svg class="icon"><use href="#i-save"></use></svg>
+                                <span id="saveText">Sumar entradas</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="alert alert-danger mt-2 mb-0" id="invErrors" style="display:none"></div>
+                </div>
+            </div>
+
+            <div class="card-x">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--warning)"><use href="#i-history"></use></svg>
+                    <h2 class="card-x__title">Movimientos</h2>
+                    <span class="chip ms-2" id="movesFilter" style="display:none"></span>
+                    <button type="button" class="btn btn-soft btn-sm ms-auto" id="movesAll" style="display:none">Ver todos</button>
+                </div>
+                <div class="table-wrap">
+                    <table class="table-x">
+                        <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Producto</th>
+                            <th>Movimiento</th>
+                            <th class="t-right">Cambio</th>
+                            <th class="t-right">Antes → Después</th>
+                            <th>Usuario</th>
+                        </tr>
+                        </thead>
+                        <tbody id="movesBody"></tbody>
+                    </table>
+                    <div class="empty" id="movesEmpty" style="display:none"><p>Sin movimientos todavía.</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ Agregar productos -->
+        <div class="col-xl-4">
+            <div class="card-x inv-add">
+                <div class="card-x__head">
+                    <svg class="icon" style="color:var(--success)"><use href="#i-plus"></use></svg>
+                    <h2 class="card-x__title">Agregar productos</h2>
+                </div>
+                <div class="card-x__body">
+                    <div class="fs-12 text-soft mb-2">
+                        Categorías habilitadas: <b>@categorias</b>
+                    </div>
+                    <div class="field-search">
+                        <svg class="icon"><use href="#i-search"></use></svg>
+                        <input type="text" class="form-control" id="invSearch" autocomplete="off"
+                               placeholder="Nombre, código o dispare la pistola" />
+                    </div>
+                    <div class="inv-results" id="invResults"></div>
+                    <div class="form-hint mt-2">
+                        Quitar un producto del inventario no borra su cantidad: si lo vuelve a agregar,
+                        sigue donde estaba.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@Html.AntiForgeryToken()
+
+@section Scripts {
+    <script>
+        window.INV_CONFIG = {
+            urls: {
+                search: '@Url.Action("Search")',
+                track: '@Url.Action("Track")',
+                untrack: '@Url.Action("Untrack")',
+                apply: '@Url.Action("Apply")',
+                movements: '@Url.Action("Movements")'
+            },
+            rows: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(InventoryJson.Rows(Model.Rows),
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }))
+        };
+    </script>
+    <script src="~/js/inventory.js" asp-append-version="true"></script>
+}

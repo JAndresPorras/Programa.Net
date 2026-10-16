@@ -45,7 +45,18 @@
                 {
                     <tr>
                         <td><span class="cat-dot" style="width:22px;height:22px;background:@c.Color"></span></td>
-                        <td><b>@c.Name</b></td>
+                        <td>
+                            @if (c.ParentCategory is not null)
+                            {
+                                <span class="text-muted-x" style="margin-left:14px">↳</span>
+                                <span class="fs-12 text-muted-x">@c.ParentCategory.Name ›</span>
+                            }
+                            <b>@c.Name</b>
+                            @if (c.InventoryEnabled)
+                            {
+                                <span class="chip chip--success ms-1" title="Sus productos se pueden elegir en Inventario">Inventario</span>
+                            }
+                        </td>
                         <td class="text-soft fs-13">@(c.Description ?? "—")</td>
                         <td class="t-center num">@c.Products.Count</td>
                         <td class="t-center">

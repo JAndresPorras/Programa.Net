@@ -106,6 +106,20 @@
             tr.querySelector('.line-meta').textContent =
                 line.code + (line.categoryName ? ' · ' + line.categoryName : '') + ' · ' + line.unit;
 
+            // Producto del inventario personalizado: muestra lo que dice el sistema.
+            // En rojo si el ticket lo supera, pero nunca impide vender.
+            if (line.trackInventory) {
+                const badge = document.createElement('span');
+                badge.className = 'inv-badge' + (line.stockShort ? ' inv-badge--short' : '');
+                badge.textContent = line.stockShort
+                    ? 'Inventario: ' + line.stockText + ' · se ajusta al cobrar'
+                    : 'Inventario: ' + line.stockText;
+                badge.title = line.stockShort
+                    ? 'El inventario digital no alcanza. Al cobrar se pide confirmar y se ajusta solo.'
+                    : 'Existencia registrada en el inventario';
+                tr.querySelector('.line-meta').appendChild(badge);
+            }
+
             tr.querySelectorAll('[data-act]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     const act = btn.getAttribute('data-act');
@@ -486,7 +500,38 @@
     /* ----------------------------------------------- Cierre de la venta -- */
     const changeModal = new bootstrap.Modal(document.getElementById('changeModal'));
 
-    function checkout() {
+    /* ------------------------------------- Faltante de inventario digital - */
+    const stockModalEl = document.getElementById('stockModal');
+    const stockModal = new bootstrap.Modal(stockModalEl);
+    let stockConfirmed = false;
+
+    function showShortages(shortages) {
+        const list = document.getElementById('stockList');
+        list.innerHTML = '';
+        shortages.forEach(function (x) {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td></td><td class="t-right num"></td><td class="t-right num"></td><td class="t-right num"></td>';
+            row.children[0].textContent = x.name;
+            row.children[1].textContent = x.stockText + ' ' + x.unit;
+            row.children[2].textContent = x.quantityText + ' ' + x.unit;
+            row.children[3].textContent = '+' + x.missingText;
+            list.appendChild(row);
+        });
+        stockModal.show();
+        setTimeout(function () { document.getElementById('stockConfirm').focus(); }, 250);
+    }
+
+    document.getElementById('stockConfirm').addEventListener('click', function () {
+        stockConfirmed = true;
+        stockModal.hide();
+        checkout(true);
+    });
+    stockModalEl.addEventListener('hidden.bs.modal', function () {
+        if (!stockConfirmed) { focusScanner(); }
+        stockConfirmed = false;
+    });
+
+    function checkout(confirmStockShortage) {
         if (busy) { return; }
         const total = Number(cart.total || 0);
         if (total <= 0) { window.posToast('El ticket está vacío.', 'danger'); return; }
@@ -507,8 +552,14 @@
             paymentMethod: paymentMethod,
             customerName: null,
             customerDocument: null,
-            notes: null
+            notes: null,
+            confirmStockShortage: confirmStockShortage === true
         }).then(function (res) {
+            // El inventario digital no alcanza: se informa y se pide confirmar.
+            if (!res.success && res.data && res.data.needsStockConfirmation) {
+                showShortages(res.data.shortages || []);
+                return;
+            }
             if (!res.success) {
                 window.posToast(res.message || 'No se pudo cerrar la venta.', 'danger');
                 return;
@@ -542,7 +593,7 @@
         frame.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'auto=1';
     }
 
-    el.checkout.addEventListener('click', checkout);
+    el.checkout.addEventListener('click', function () { checkout(false); });
     document.getElementById('btnNextSale').addEventListener('click', focusScanner);
     document.getElementById('changeModal').addEventListener('hidden.bs.modal', focusScanner);
 

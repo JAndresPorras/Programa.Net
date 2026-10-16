@@ -16,6 +16,7 @@
         "cash" => "Caja",
         "sales" => "Ventas",
         "products" or "categories" => "Catálogo",
+        "inventory" => "Inventario",
         "reports" => "Reportes",
         "users" => "Administración",
         "settings" => "Administración",
@@ -48,19 +49,31 @@
 
         <nav class="sidebar__nav">
             <div class="sidebar__section">Operación</div>
-            <a class="sidebar__link @Active("pos")" asp-controller="Pos" asp-action="Index">
-                <svg class="icon"><use href="#i-scan"></use></svg> Punto de venta
-            </a>
-            <a class="sidebar__link @Active("cash")" asp-controller="Cash" asp-action="Index">
-                <svg class="icon"><use href="#i-cash"></use></svg> Caja del día
-            </a>
+            @if (User.HasPermission(Permissions.PosSell))
+            {
+                <a class="sidebar__link @Active("pos")" asp-controller="Pos" asp-action="Index">
+                    <svg class="icon"><use href="#i-scan"></use></svg> Punto de venta
+                </a>
+            }
+            @if (User.HasAnyPermission(Permissions.CashOpen, Permissions.CashClose, Permissions.CashViewAll))
+            {
+                <a class="sidebar__link @Active("cash")" asp-controller="Cash" asp-action="Index">
+                    <svg class="icon"><use href="#i-cash"></use></svg> Caja del día
+                </a>
+            }
             <a class="sidebar__link @Active("sales")" asp-controller="Sales" asp-action="Index">
                 <svg class="icon"><use href="#i-receipt"></use></svg> Ventas del día
             </a>
 
-            @if (User.HasAnyPermission(Permissions.ProductsView, Permissions.CategoriesManage))
+            @if (User.HasAnyPermission(Permissions.ProductsView, Permissions.CategoriesManage, Permissions.InventoryManage))
             {
                 <div class="sidebar__section">Catálogo</div>
+                @if (User.HasPermission(Permissions.InventoryManage))
+                {
+                    <a class="sidebar__link @Active("inventory")" asp-controller="Inventory" asp-action="Index">
+                        <svg class="icon"><use href="#i-coins"></use></svg> Inventario
+                    </a>
+                }
                 @if (User.HasPermission(Permissions.ProductsView))
                 {
                     <a class="sidebar__link @Active("products")" asp-controller="Products" asp-action="Index">

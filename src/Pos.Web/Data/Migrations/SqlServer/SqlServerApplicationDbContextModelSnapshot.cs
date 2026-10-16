@@ -497,6 +497,9 @@ namespace Pos.Web.Data.Migrations.SqlServer
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
+                    b.Property<bool>("InventoryEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -505,12 +508,67 @@ namespace Pos.Web.Data.Migrations.SqlServer
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<int?>("ParentCategoryId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique();
 
+                    b.HasIndex("ParentCategoryId");
+
                     b.ToTable("Categories");
+                });
+
+            modelBuilder.Entity("Pos.Web.Models.InventoryMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int?>("SaleId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("StockAfter")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<decimal>("StockBefore")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("ProductId", "CreatedAt");
+
+                    b.ToTable("InventoryMovements");
                 });
 
             modelBuilder.Entity("Pos.Web.Models.PriceHistory", b =>
@@ -609,6 +667,9 @@ namespace Pos.Web.Data.Migrations.SqlServer
 
                     b.Property<decimal>("Stock")
                         .HasColumnType("decimal(18,3)");
+
+                    b.Property<bool>("TrackInventory")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -871,6 +932,27 @@ namespace Pos.Web.Data.Migrations.SqlServer
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Pos.Web.Models.Category", b =>
+                {
+                    b.HasOne("Pos.Web.Models.Category", "ParentCategory")
+                        .WithMany("SubCategories")
+                        .HasForeignKey("ParentCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentCategory");
+                });
+
+            modelBuilder.Entity("Pos.Web.Models.InventoryMovement", b =>
+                {
+                    b.HasOne("Pos.Web.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Pos.Web.Models.PriceHistory", b =>
                 {
                     b.HasOne("Pos.Web.Models.ApplicationUser", "ChangedByUser")
@@ -946,6 +1028,8 @@ namespace Pos.Web.Data.Migrations.SqlServer
             modelBuilder.Entity("Pos.Web.Models.Category", b =>
                 {
                     b.Navigation("Products");
+
+                    b.Navigation("SubCategories");
                 });
 
             modelBuilder.Entity("Pos.Web.Models.Product", b =>

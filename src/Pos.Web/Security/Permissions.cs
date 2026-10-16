@@ -29,6 +29,9 @@ public static class Permissions
     public const string CashMovements = "cash.movements";
     public const string CashViewAll = "cash.viewall";
 
+    // Inventario
+    public const string InventoryManage = "inventory.manage";
+
     // Reportes
     public const string ReportsSales = "reports.sales";
     public const string ReportsProduction = "reports.production";
@@ -61,6 +64,8 @@ public static class Permissions
         new(CashMovements,      "Caja", "Ingresos y retiros",      "Registrar movimientos de efectivo"),
         new(CashViewAll,        "Caja", "Ver cajas de todos",      "Consultar los turnos de otras cajeras"),
 
+        new(InventoryManage,    "Inventario", "Llevar el inventario", "Elegir productos, registrar entradas, editar cantidades y exportar a Excel"),
+
         new(ReportsSales,       "Reportes", "Reporte de ventas",   "Ver ventas por dia, usuario y categoria"),
         new(ReportsProduction,  "Reportes", "Pedido a produccion", "Generar el listado de lo vendido para la planta"),
         new(ReportsExport,      "Reportes", "Exportar",            "Descargar los reportes en CSV"),
@@ -84,6 +89,7 @@ public static class Roles
     public const string Admin = "Administrador";
     public const string Supervisor = "Supervisor";
     public const string Cashier = "Cajera";
+    public const string ReportsAdmin = "informes_admin";
 
     /// <summary>El administrador tiene absolutamente todos los permisos.</summary>
     public static string[] AdminPermissions => Permissions.Values.ToArray();
@@ -94,6 +100,18 @@ public static class Roles
         Permissions.ProductsView, Permissions.ProductsCreate, Permissions.ProductsEdit, Permissions.ProductsChangePrice,
         Permissions.CategoriesManage,
         Permissions.CashOpen, Permissions.CashClose, Permissions.CashMovements, Permissions.CashViewAll,
+        Permissions.InventoryManage,
+        Permissions.ReportsSales, Permissions.ReportsProduction, Permissions.ReportsExport
+    ];
+
+    /// <summary>
+    /// Consulta reportes y lleva el inventario. No vende ni maneja caja ni
+    /// configuracion: el administrador puede sumarle permisos si los necesita.
+    /// </summary>
+    public static string[] ReportsAdminPermissions =>
+    [
+        Permissions.ProductsView,
+        Permissions.InventoryManage,
         Permissions.ReportsSales, Permissions.ReportsProduction, Permissions.ReportsExport
     ];
 

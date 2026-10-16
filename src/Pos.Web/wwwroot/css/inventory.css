@@ -1,0 +1,112 @@
+/* =========================================================================
+   Vista de inventario personalizado
+   Verde = Entrada (suma). Ambar = Editar cantidad (reemplaza).
+   ========================================================================= */
+
+.inv-mode {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.inv-mode__btn {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    text-align: left;
+    border: 2px solid var(--line-strong);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.inv-mode__btn b { display: block; font-size: 15px; color: var(--ink); }
+.inv-mode__what { display: block; font-size: 13px; font-weight: 600; }
+.inv-mode__btn small { display: block; font-size: 11.5px; color: var(--ink-muted); margin-top: 2px; }
+
+.inv-mode__icon {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    display: grid; place-items: center;
+    background: var(--canvas); color: var(--ink-muted);
+}
+
+.inv-mode__btn--entry.is-active { border-color: var(--success); background: var(--success-light); color: #065f46; }
+.inv-mode__btn--entry.is-active .inv-mode__icon { background: var(--success); color: #fff; }
+.inv-mode__btn--set.is-active { border-color: var(--warning); background: var(--warning-light); color: #92400e; }
+.inv-mode__btn--set.is-active .inv-mode__icon { background: var(--warning); color: #fff; }
+.inv-mode__btn:not(.is-active):hover { border-color: var(--ink-muted); }
+
+.inv-mode__hint {
+    margin-top: 10px;
+    font-size: 12.5px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+}
+.inv-mode__hint--entry { background: var(--success-light); color: #065f46; }
+.inv-mode__hint--set { background: var(--warning-light); color: #92400e; }
+
+/* La columna donde se escribe toma el color del modo activo. */
+.inv-table--entry .inv-col-input { background: #f0fdf4; }
+.inv-table--set .inv-col-input { background: #fffbeb; }
+.inv-table--entry thead .inv-col-input { color: #065f46; }
+.inv-table--set thead .inv-col-input { color: #92400e; }
+
+.inv-input {
+    width: 120px;
+    text-align: right;
+    font-weight: 700;
+    font-family: var(--font-num);
+}
+.inv-table--entry .inv-input:focus { border-color: var(--success); box-shadow: 0 0 0 3px rgba(5, 150, 105, .15); }
+.inv-table--set .inv-input:focus { border-color: var(--warning); box-shadow: 0 0 0 3px rgba(217, 119, 6, .18); }
+
+.inv-name { font-weight: 600; font-size: 13.5px; }
+.inv-calc { color: var(--ink-muted); font-family: var(--font-num); font-size: 12.5px; }
+.inv-new { font-family: var(--font-num); font-size: 15px; }
+.inv-new--entry { color: var(--success); }
+.inv-new--set { color: var(--warning); }
+.inv-diff { font-size: 11.5px; color: var(--ink-muted); font-family: var(--font-num); }
+.inv-bad { color: var(--danger); font-size: 12px; font-weight: 600; }
+
+.inv-row--typed { background: #fafcff; }
+.inv-row--new { animation: inv-flash 1.2s ease; }
+@keyframes inv-flash { 0% { background: #bbf7d0; } 100% { background: transparent; } }
+
+.inv-save { min-width: 220px; }
+
+/* Agregar productos */
+.inv-add { position: sticky; top: calc(var(--topbar-h) + 16px); }
+
+.field-search { position: relative; }
+.field-search .icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--ink-muted); pointer-events: none;
+}
+.field-search .form-control { padding-left: 38px; }
+
+.inv-results { margin-top: 10px; max-height: 52vh; overflow-y: auto; }
+.inv-result {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 4px; border-bottom: 1px solid #f1f5f9;
+}
+.inv-result__text { flex: 1; min-width: 0; font-size: 13px; }
+.inv-result.is-tracked .inv-result__text { opacity: .7; }
+
+/* Tipos de movimiento */
+.inv-type--Entry { background: var(--success-light); color: #065f46; border-color: #a7f3d0; }
+.inv-type--Set { background: var(--warning-light); color: #92400e; border-color: #fde68a; }
+.inv-type--Sale { background: var(--canvas); color: var(--ink-soft); }
+.inv-type--SaleAdjustment { background: var(--danger-light); color: #991b1b; border-color: #fecaca; }
+.inv-type--SaleCancelled { background: var(--info-light); color: #155e75; border-color: #a5f3fc; }
+
+@media (max-width: 1199.98px) {
+    .inv-add { position: static; }
+}
+
+@media (max-width: 575.98px) {
+    .inv-mode { grid-template-columns: 1fr; }
+    .inv-input { width: 90px; }
+    .inv-save { min-width: 0; flex: 1; }
+}

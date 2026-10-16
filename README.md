@@ -16,8 +16,9 @@ día se hace la entrega de caja al dueño.
 | **Maestro de códigos de barras** | Cada código apunta a un producto con categoría, código, nombre, precio e imagen opcional. Un producto puede tener varios códigos. |
 | **Precios pagables** | Al escribir el precio se ve el **precio al público** con impuesto y el sistema avisa cuánto subir o bajar para que se pueda pagar exacto con las monedas del país. |
 | **Venta por peso** | Los productos marcados por peso piden los kilos en el punto de venta (2 enteros y 3 decimales) y calculan el importe. |
+| **Inventario personalizado** | Usted elige qué yogures y quesos controlar, registra entradas o corrige cantidades, y las ventas los descuentan solas sin bloquear nunca la caja. Exportable a Excel. |
 | **Historial de precios** | Cada cambio de precio guarda precio anterior, precio nuevo, fecha, hora, usuario y motivo. |
-| **Usuarios, roles y permisos** | 22 permisos finos agrupados por módulo. El rol da los permisos base y a cada persona se le pueden sumar permisos extra. |
+| **Usuarios, roles y permisos** | 23 permisos finos agrupados por módulo. El rol da los permisos base y a cada persona se le pueden sumar permisos extra. |
 | **Caja del día** | Apertura con fondo inicial, ingresos y retiros de efectivo, arqueo por denominaciones y **entrega de caja al dueño**. |
 | **Recibos** | Listado del día, detalle, reimpresión y anulación con motivo. |
 | **Reporte de ventas** | Por día, hora, cajera, categoría, forma de pago y productos más vendidos. Exportable a CSV. |
@@ -130,7 +131,7 @@ En la pantalla del punto de venta:
 
 - El cursor vuelve **solo** al campo de escaneo, aunque la cajera haga clic en otro lado.
 - Cada disparo agrega el producto; si dispara el mismo código otra vez, suma una unidad.
-- Para vender varias unidades de un tirón se puede escribir `3*7750001000015` y `Enter`.
+- Para vender varias unidades de un tirón se puede escribir `3*7750001000013` y `Enter`.
 - Si el código no está en el maestro, sale un aviso claro con el código leído.
 
 También puede dispararle a la pistola dentro del campo *Códigos de barras* de la
@@ -244,12 +245,83 @@ peso, se abre la **balanza**: escribe los kilos (hasta **2 enteros y 3
 decimales**, máximo 99.999), ve el importe calculado en vivo y lo agrega al
 ticket. El peso queda visible en la línea y se corrige presionándolo.
 
-También funciona escribiendo `0.755*7750001000121` directo en el campo de
+También funciona escribiendo `0.755*7750001000129` directo en el campo de
 escaneo, para cuando la balanza ya imprimió el peso.
 
 ---
 
-## 8. El día de trabajo
+## 8. Inventario personalizado (Yogures y Quesos)
+
+Un inventario **opcional**: no se activa para toda la tienda, usted elige
+producto por producto qué quiere controlar. Está en el menú
+**Catálogo → Inventario**.
+
+### Qué productos se pueden elegir
+
+Los de las categorías marcadas con **«Permite inventario personalizado»**. En una
+instalación nueva vienen marcadas **Yogures** y **Quesos**, dentro de la categoría
+principal **Lácteos**. Habilitar la categoría no controla nada por sí solo: hay que
+agregar cada producto en la vista de inventario. Para sumar otra categoría más
+adelante basta con marcarla en *Categorías*.
+
+### La vista de inventario
+
+- **Agregar productos**: busque por nombre, código o dispare la pistola sobre el
+  código de barras, y presione *Agregar*.
+- La **selección se guarda sola** en la base de datos: sigue ahí al cerrar sesión,
+  al reiniciar el servidor y para cualquier usuario.
+- **Quitar** un producto no borra su cantidad: si lo vuelve a agregar, sigue donde
+  estaba.
+- Cada fila muestra la cantidad en el sistema y cuándo y quién la cargó por última vez.
+
+### Entrada o Editar cantidad: dos operaciones bien distintas
+
+Arriba de la tabla se elige qué hace el número que escribe:
+
+| Modo | Color | Qué hace | Ejemplo |
+|---|---|---|---|
+| **Entrada** | verde | **Suma** a lo que hay | hay 5, llegan 10 → **15** |
+| **Editar cantidad** | ámbar | **Reemplaza** por lo contado | hay 5, cuenta 10 → **10** |
+
+Antes de guardar, cada fila muestra el resultado (`5 + 10 = 15` o `5 → 10`), el
+encabezado de la columna y el botón cambian según el modo (*Sumar entradas* /
+*Reemplazar cantidades*), y si cambia de modo con cantidades ya escritas el
+sistema le pregunta, porque cambia lo que significan. Puede cargar varias filas y
+guardarlas juntas: `Enter` pasa a la fila siguiente. Si una sola cantidad es
+inválida no se guarda ninguna, para no dejar un conteo a medias.
+
+Las unidades se cuentan enteras; los productos por peso aceptan 3 decimales.
+
+### Las ventas
+
+- Cada venta **descuenta sola** las unidades de los productos del inventario.
+- Si el sistema dice que no alcanza, **avisa pero nunca bloquea**: al escanear sale
+  un aviso amarillo y la línea del ticket lo marca; al cobrar se pide confirmar.
+- **Ejemplo:** el sistema dice 9 quesos y se venden 10. Al cobrar aparece
+  *«El inventario digital no alcanza»* con el detalle. Al confirmar, la venta se
+  cierra, el inventario se ajusta a 10 (*Ajuste automático por venta*, +1) y sale la
+  venta (−10). Queda en **0**, nunca en negativo.
+- Si se anula el recibo, las unidades vuelven al inventario.
+- Los productos que **no** están en el inventario personalizado no cambian: siguen
+  como siempre.
+
+Todo queda en **Movimientos**: entradas, ediciones, ventas, ajustes y anulaciones,
+con la cantidad antes y después, el usuario y el recibo.
+
+### Exportar a Excel
+
+El botón **Exportar a Excel** descarga un libro con dos hojas: *Inventario* (cada
+producto con su cantidad, mínimo, estado y última actualización) y *Movimientos*
+(los últimos 90 días), listas para filtrar.
+
+### Quién lo usa
+
+El permiso **«Llevar el inventario»** lo tienen el Administrador, el Supervisor y el
+rol **informes_admin**. Para dárselo a otra persona, use *Usuarios y permisos*.
+
+---
+
+## 9. El día de trabajo
 
 1. **Abrir caja** — *Caja del día* → fondo inicial (el sencillo con el que arranca).
 2. **Vender** — escanear, escribir el dinero recibido, `F2`. El sistema muestra el
@@ -275,35 +347,56 @@ escaneo, para cuando la balanza ya imprimió el peso.
 
 ---
 
-## 9. Permisos
+## 10. Permisos
 
-Tres roles listos para usar, editables desde *Usuarios → Permisos por rol*:
+Cuatro roles listos para usar, editables desde *Usuarios → Permisos por rol*:
 
 - **Administrador** — todo. Siempre conserva todos los permisos y el sistema
   no deja desactivar al último administrador activo.
 - **Supervisor** — vender, catálogo, precios, caja de todos y reportes.
 - **Cajera** — vender, ver su recaudado, consultar productos, abrir y cerrar su
   propia caja y sacar el pedido a producción.
+- **informes_admin** — reportes de ventas y de producción, exportar, consultar
+  productos y llevar el inventario. No vende ni maneja caja ni configuración; al
+  ingresar entra directo a *Inventario*.
 
-Los 22 permisos se agrupan en *Punto de venta*, *Catálogo*, *Caja*, *Reportes* y
-*Administración*. A una persona se le pueden dar permisos extra por encima de su
+Los 23 permisos se agrupan en *Punto de venta*, *Catálogo*, *Inventario*, *Caja*,
+*Reportes* y *Administración*. A una persona se le pueden dar permisos extra por encima de su
 rol sin cambiarle el rol a nadie más.
+
+Si el administrador le quita un permiso a un rol, **se mantiene quitado** aunque el
+servidor se reinicie. Cuando una versión nueva del sistema trae un permiso nuevo,
+se agrega a los roles una sola vez.
 
 ---
 
-## 10. Cómo está organizado el código
+## 11. Cómo está organizado el código
 
 ```
 src/Pos.Web/
-├── Controllers/     Pos, Sales, Cash, Products, Categories, Reports, Settings, Users, Account
+├── Controllers/     Pos, Sales, Cash, Products, Categories, Inventory, Reports, Settings, Users, Account
 ├── Data/            DbContext (SQLite + SQL Server), migraciones y datos iniciales
 ├── Models/          Product, Barcode, PriceHistory, Sale, SaleItem, CashSession, AppSetting...
 ├── Security/        Permisos, políticas de autorización y atributo [HasPermission]
-├── Services/        Carrito, ventas, caja, reportes, configuración, moneda e impresión ESC/POS
+├── Services/        Carrito, ventas, inventario, caja, reportes, configuración, moneda e impresión ESC/POS
 ├── ViewModels/      Modelos de las pantallas
 ├── Views/           Vistas Razor en español
 └── wwwroot/         CSS propio, JS del punto de venta y Bootstrap local (funciona sin internet)
+
+tests/Pos.Tests/     Pruebas automáticas: levantan la aplicación real con una base temporal
 ```
+
+### Pruebas automáticas
+
+```bash
+dotnet test
+```
+
+Cada prueba arranca la aplicación completa (migraciones, roles, vistas) contra su
+propia base SQLite temporal y la usa como lo haría el navegador: inicia sesión,
+escanea, cobra, carga inventario. Cubren lo que ya existía (para detectar si un
+cambio lo rompe) y todo el inventario, incluidos los casos límite y diez cajas
+vendiendo el mismo producto a la vez.
 
 El punto de venta no depende de ningún CDN: Bootstrap está en `wwwroot/lib` y los
 íconos son un sprite SVG local, así que la caja sigue funcionando sin internet.

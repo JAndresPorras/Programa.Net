@@ -27,6 +27,7 @@
     @Html.AntiForgeryToken()
     <input type="hidden" asp-for="Id" />
     <input type="hidden" asp-for="OriginalPrice" />
+    <input type="hidden" asp-for="OriginalStock" />
 
     <div asp-validation-summary="ModelOnly" class="alert alert-danger"
          style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
@@ -56,7 +57,7 @@
                                 <option value="">— Seleccione —</option>
                                 @foreach (var cat in Model.Categories)
                                 {
-                                    <option value="@cat.Id" selected="@(Model.CategoryId == cat.Id)">@cat.Name</option>
+                                    <option value="@cat.Id" selected="@(Model.CategoryId == cat.Id)">@cat.FullName</option>
                                 }
                             </select>
                             <span asp-validation-for="CategoryId" class="text-danger"></span>
@@ -221,13 +222,21 @@
                     <div class="row g-2">
                         <div class="col-6">
                             <label asp-for="Stock" class="form-label"></label>
-                            <input asp-for="Stock" class="form-control" type="number" step="0.001" />
+                            <input asp-for="Stock" class="form-control" type="number" step="0.001"
+                                   disabled="@Model.TrackInventory" />
                         </div>
                         <div class="col-6">
                             <label asp-for="MinStock" class="form-label"></label>
                             <input asp-for="MinStock" class="form-control" type="number" step="0.001" />
                         </div>
                     </div>
+                    @if (Model.TrackInventory)
+                    {
+                        <div class="form-hint mt-2">
+                            Este producto está en el inventario personalizado: su cantidad se actualiza desde
+                            <a asp-controller="Inventory" asp-action="Index">Inventario</a>, donde queda cada movimiento.
+                        </div>
+                    }
                 </div>
 
                 @* Solo tiene sentido cuando el producto se marca como vendido por peso. *@

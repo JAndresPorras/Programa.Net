@@ -118,8 +118,11 @@ public interface ISettingsService
 /// </summary>
 public class SettingsService(IServiceScopeFactory scopeFactory, ILogger<SettingsService> logger) : ISettingsService
 {
-    private static PosSettings? _cache;
-    private static readonly SemaphoreSlim Lock = new(1, 1);
+    // El servicio se registra como singleton, asi que la cache vive una sola vez
+    // por aplicacion. No debe ser static: dos aplicaciones en el mismo proceso
+    // (por ejemplo en las pruebas) se pisarian la configuracion.
+    private PosSettings? _cache;
+    private readonly SemaphoreSlim Lock = new(1, 1);
 
     public PosSettings Current => _cache ?? GetAsync().GetAwaiter().GetResult();
 

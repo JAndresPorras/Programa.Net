@@ -134,7 +134,7 @@ public class ProductsController(
             {
                 Code = code,
                 IsPrimary = product.Barcodes.Count == 0,
-                Symbology = code.Length == 13 ? "EAN13" : "CODE128",
+                Symbology = BarcodeRules.IsValidEan13(code) ? "EAN13" : "CODE128",
                 CreatedByUserId = User.GetUserId()
             });
         }
@@ -182,6 +182,8 @@ public class ProductsController(
             CategoryId = product.CategoryId,
             Price = product.Price,
             OriginalPrice = product.Price,
+            OriginalStock = product.Stock,
+            TrackInventory = product.TrackInventory,
             Cost = product.Cost,
             Stock = product.Stock,
             MinStock = product.MinStock,
@@ -212,6 +214,7 @@ public class ProductsController(
         ViewData["Title"] = $"Editar {product.Name}";
         model.Categories = await CategoriesAsync();
         model.OriginalPrice = product.Price;
+        model.TrackInventory = product.TrackInventory;
         model.ImagePath = product.ImagePath;
         model.CanChangePrice = User.HasPermission(Permissions.ProductsChangePrice);
         model.PriceHistory = product.PriceHistories.OrderByDescending(h => h.ChangedAt).Take(20).ToList();
@@ -255,7 +258,14 @@ public class ProductsController(
         product.CategoryId = model.CategoryId;
         product.Price = model.Price;
         product.Cost = model.Cost;
-        product.Stock = model.Stock;
+        // El stock solo se escribe si quien edita lo cambio. Si no, una venta hecha
+        // mientras el formulario estaba abierto se perderia al guardar el nombre.
+        // Los productos del inventario personalizado se manejan solo desde Inventario,
+        // donde cada cambio queda registrado como movimiento.
+        if (!product.TrackInventory && model.Stock != model.OriginalStock)
+        {
+            product.Stock = model.Stock;
+        }
         product.MinStock = model.MinStock;
         product.Unit = model.Unit.Trim().ToUpperInvariant();
         product.SoldByWeight = model.SoldByWeight;
@@ -288,7 +298,7 @@ public class ProductsController(
             product.Barcodes.Add(new Barcode
             {
                 Code = code,
-                Symbology = code.Length == 13 ? "EAN13" : "CODE128",
+                Symbology = BarcodeRules.IsValidEan13(code) ? "EAN13" : "CODE128",
                 CreatedByUserId = User.GetUserId()
             });
         }
@@ -388,7 +398,9 @@ public class ProductsController(
     }
 
     private async Task<List<Category>> CategoriesAsync() =>
-        await db.Categories.Where(c => c.IsActive).OrderBy(c => c.Name).AsNoTracking().ToListAsync();
+        (await db.Categories.Include(c => c.ParentCategory).Where(c => c.IsActive).AsNoTracking().ToListAsync())
+            .OrderBy(c => c.FullName)
+            .ToList();
 
     /// <summary>Separa los códigos escritos por coma, punto y coma, espacio o salto de línea.</summary>
     internal static List<string> ParseBarcodes(string? raw) =>

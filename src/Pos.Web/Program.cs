@@ -82,6 +82,7 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<ICashSessionService, CashSessionService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IReceiptPrinter, EscPosPrinter>();
 
@@ -163,4 +164,9 @@ public class PosClaimsPrincipalFactory(
         identity.AddClaim(new System.Security.Claims.Claim("full_name", user.FullName));
         return identity;
     }
+}
+
+/// <summary>Expone la clase Program para las pruebas de integracion (WebApplicationFactory).</summary>
+public partial class Program
+{
 }

@@ -241,6 +241,47 @@
     </div>
 </div>
 
+<!-- ============================ Modal: inventario digital insuficiente -->
+<div class="modal fade" id="stockModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <svg class="icon" style="color:var(--warning)"><use href="#i-alert"></use></svg>
+                    El inventario digital no alcanza
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="fs-13 mb-3">
+                    Según el sistema hay menos unidades de las que está vendiendo. Si el producto
+                    está en la tienda, <b>confirme y la venta se cierra igual</b>: el inventario se
+                    ajusta solo y queda en cero.
+                </p>
+                <div class="table-wrap" style="border:1px solid var(--line);border-radius:var(--radius-sm)">
+                    <table class="table-x">
+                        <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th class="t-right">En sistema</th>
+                            <th class="t-right">Se vende</th>
+                            <th class="t-right">Ajuste</th>
+                        </tr>
+                        </thead>
+                        <tbody id="stockList"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-soft" data-bs-dismiss="modal">Revisar el ticket</button>
+                <button type="button" class="btn btn-success" id="stockConfirm">
+                    <svg class="icon"><use href="#i-check"></use></svg> Confirmar y cobrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ============================ Modal: vuelto a entregar -->
 <div class="modal fade" id="changeModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">

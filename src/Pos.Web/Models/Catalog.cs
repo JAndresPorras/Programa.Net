@@ -25,9 +25,32 @@ public class Category
     [Display(Name = "Activa")]
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// Categoria principal opcional. Permite agrupar, por ejemplo, Yogures y
+    /// Quesos dentro de Lacteos. Solo hay dos niveles: una categoria principal
+    /// no puede tener a su vez otra principal.
+    /// </summary>
+    [Display(Name = "Categoria principal")]
+    public int? ParentCategoryId { get; set; }
+
+    public Category? ParentCategory { get; set; }
+
+    public ICollection<Category> SubCategories { get; set; } = new List<Category>();
+
+    /// <summary>
+    /// Si es true, sus productos se pueden elegir en la vista de inventario.
+    /// No activa el control por si solo: el usuario elige producto por producto.
+    /// </summary>
+    [Display(Name = "Permite inventario personalizado")]
+    public bool InventoryEnabled { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<Product> Products { get; set; } = new List<Product>();
+
+    /// <summary>Nombre con su categoria principal: "Lacteos › Quesos".</summary>
+    [NotMapped]
+    public string FullName => ParentCategory is null ? Name : $"{ParentCategory.Name} › {Name}";
 }
 
 /// <summary>
@@ -96,6 +119,13 @@ public class Product
 
     [Display(Name = "Activo")]
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// Forma parte del inventario personalizado: las ventas descuentan su Stock
+    /// automaticamente y nunca se bloquean por falta de existencias digitales.
+    /// </summary>
+    [Display(Name = "Controlar inventario")]
+    public bool TrackInventory { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

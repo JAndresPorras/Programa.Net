@@ -20,19 +20,21 @@ public static class DbSeeder
 
         await db.Database.MigrateAsync();
 
-        await SeedRolesAsync(roleManager, logger);
+        await SeedRolesAsync(roleManager, db, logger);
         var admin = await SeedAdminAsync(userManager, config, logger);
         await SeedSettingsAsync(db, logger);
         await SeedCatalogAsync(db, admin, logger);
     }
 
-    private static async Task SeedRolesAsync(RoleManager<ApplicationRole> roleManager, ILogger logger)
+    private static async Task SeedRolesAsync(
+        RoleManager<ApplicationRole> roleManager, ApplicationDbContext db, ILogger logger)
     {
         var definitions = new (string Name, string Description, string[] Permissions)[]
         {
             (Roles.Admin, "Acceso total al sistema", Roles.AdminPermissions),
             (Roles.Supervisor, "Administra catalogo, caja y reportes", Roles.SupervisorPermissions),
-            (Roles.Cashier, "Vende en el punto de venta y cierra su caja", Roles.CashierPermissions)
+            (Roles.Cashier, "Vende en el punto de venta y cierra su caja", Roles.CashierPermissions),
+            (Roles.ReportsAdmin, "Consulta reportes y lleva el inventario", Roles.ReportsAdminPermissions)
         };
 
         foreach (var (name, description, permissions) in definitions)
@@ -51,13 +53,39 @@ public static class DbSeeder
                 logger.LogInformation("Rol creado: {Role}", name);
             }
 
+            // Se recuerda que permisos por defecto ya se le dieron a cada rol. Asi un
+            // permiso que el administrador quito no reaparece al reiniciar, y un
+            // permiso nuevo del sistema (como el de inventario) se agrega una sola vez.
+            var key = $"security.seeded.{name}";
+            var record = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key);
+            var seeded = record?.Value?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet();
+
+            // Sin registro (rol nuevo o base anterior a este control) se dan todos,
+            // que es lo mismo que hacia el sistema hasta ahora en cada arranque.
+            var toGrant = seeded is null ? permissions : permissions.Where(p => !seeded.Contains(p)).ToArray();
+
             var claims = await roleManager.GetClaimsAsync(role);
-            foreach (var permission in permissions)
+            foreach (var permission in toGrant)
             {
                 if (claims.Any(c => c.Type == Permissions.ClaimType && c.Value == permission)) continue;
                 await roleManager.AddClaimAsync(role,
                     new System.Security.Claims.Claim(Permissions.ClaimType, permission));
+                if (seeded is not null) logger.LogInformation("Permiso nuevo {Permission} dado al rol {Role}", permission, name);
             }
+
+            var value = string.Join(',', (seeded ?? []).Union(permissions).OrderBy(p => p));
+            if (record is null)
+            {
+                db.AppSettings.Add(new AppSetting { Key = key, Value = value, UpdatedByUserName = "sistema" });
+            }
+            else if (record.Value != value)
+            {
+                record.Value = value;
+                record.UpdatedAt = DateTime.UtcNow;
+            }
+            await db.SaveChangesAsync();
         }
     }
 
@@ -102,7 +130,9 @@ public static class DbSeeder
 
     private static async Task SeedSettingsAsync(ApplicationDbContext db, ILogger logger)
     {
-        if (await db.AppSettings.AnyAsync()) return;
+        // Instalacion nueva = todavia no hay moneda configurada. No se mira si la
+        // tabla esta vacia porque ahi tambien se guarda el registro de permisos.
+        if (await db.AppSettings.AnyAsync(s => s.Key == SettingKeys.CurrencyCode)) return;
 
         var defaults = new Dictionary<string, string>
         {
@@ -140,33 +170,46 @@ public static class DbSeeder
     {
         if (await db.Categories.AnyAsync()) return;
 
+        var lacteos = new Category { Name = "Lacteos", Description = "Leche, yogures y quesos", Color = "#2563eb" };
         var categories = new List<Category>
         {
             new() { Name = "Panaderia",  Description = "Pan y productos de horno", Color = "#d97706" },
             new() { Name = "Pasteleria", Description = "Tortas y postres",          Color = "#db2777" },
             new() { Name = "Bebidas",    Description = "Gaseosas, jugos y agua",    Color = "#0891b2" },
-            new() { Name = "Abarrotes",  Description = "Productos de despensa",     Color = "#65a30d" }
+            new() { Name = "Abarrotes",  Description = "Productos de despensa",     Color = "#65a30d" },
+            lacteos,
+            // Las dos subcategorias que pueden llevar inventario. Habilitarlas no
+            // controla ningun producto: el usuario elige cuales en la vista Inventario.
+            new() { Name = "Yogures", Description = "Yogures y bebibles", Color = "#7c3aed",
+                    ParentCategory = lacteos, InventoryEnabled = true },
+            new() { Name = "Quesos",  Description = "Quesos frescos y madurados", Color = "#ca8a04",
+                    ParentCategory = lacteos, InventoryEnabled = true }
         };
         db.Categories.AddRange(categories);
         await db.SaveChangesAsync();
 
         // Los precios son multiplos de la moneda mas pequena para que el total
         // siempre se pueda cobrar exacto. Los marcados por peso se venden en kilos.
+        // Los codigos de barras son EAN-13 con su digito verificador correcto: uno
+        // incorrecto se imprimiria con otro numero y la pistola no lo encontraria.
         var seedProducts = new (string Cat, string Code, string Name, decimal Price, string Barcode,
-                                string Unit, bool Produced, bool ByWeight)[]
+                                string Unit, bool Produced, bool ByWeight, decimal Stock, decimal MinStock)[]
         {
-            ("Panaderia",  "PAN-001", "Pan frances (unidad)",      0.50m, "7750001000015", "UND", true,  false),
-            ("Panaderia",  "PAN-002", "Pan integral 500g",         6.50m, "7750001000022", "UND", true,  false),
-            ("Panaderia",  "PAN-003", "Ciabatta artesanal",        3.00m, "7750001000039", "UND", true,  false),
-            ("Panaderia",  "PAN-004", "Pan de yema (por kilo)",   12.50m, "7750001000114", "KG",  true,  true),
-            ("Pasteleria", "PAS-001", "Torta de chocolate porcion",8.00m, "7750001000046", "UND", true,  false),
-            ("Pasteleria", "PAS-002", "Alfajor de manjar",         2.50m, "7750001000053", "UND", true,  false),
-            ("Bebidas",    "BEB-001", "Agua mineral 625ml",        2.00m, "7750001000060", "UND", false, false),
-            ("Bebidas",    "BEB-002", "Gaseosa 500ml",             3.50m, "7750001000077", "UND", false, false),
-            ("Bebidas",    "BEB-003", "Jugo de naranja 1L",        9.90m, "7750001000084", "UND", false, false),
-            ("Abarrotes",  "ABA-001", "Arroz extra 1kg",           4.80m, "7750001000091", "UND", false, false),
-            ("Abarrotes",  "ABA-002", "Azucar rubia 1kg",          4.20m, "7750001000107", "UND", false, false),
-            ("Abarrotes",  "ABA-003", "Queso fresco (por kilo)",  28.00m, "7750001000121", "KG",  false, true)
+            ("Panaderia",  "PAN-001", "Pan frances (unidad)",         0.50m, "7750001000013", "UND",  true, false,   100m, 10m),
+            ("Panaderia",  "PAN-002", "Pan integral 500g",            6.50m, "7750001000020", "UND",  true, false,   100m, 10m),
+            ("Panaderia",  "PAN-003", "Ciabatta artesanal",           3.00m, "7750001000037", "UND",  true, false,   100m, 10m),
+            ("Panaderia",  "PAN-004", "Pan de yema (por kilo)",      12.50m, "7750001000112", "KG",   true,  true,   100m, 10m),
+            ("Pasteleria", "PAS-001", "Torta de chocolate porcion",   8.00m, "7750001000044", "UND",  true, false,   100m, 10m),
+            ("Pasteleria", "PAS-002", "Alfajor de manjar",            2.50m, "7750001000051", "UND",  true, false,   100m, 10m),
+            ("Bebidas",    "BEB-001", "Agua mineral 625ml",           2.00m, "7750001000068", "UND", false, false,   100m, 10m),
+            ("Bebidas",    "BEB-002", "Gaseosa 500ml",                3.50m, "7750001000075", "UND", false, false,   100m, 10m),
+            ("Bebidas",    "BEB-003", "Jugo de naranja 1L",           9.90m, "7750001000082", "UND", false, false,   100m, 10m),
+            ("Abarrotes",  "ABA-001", "Arroz extra 1kg",              4.80m, "7750001000099", "UND", false, false,   100m, 10m),
+            ("Abarrotes",  "ABA-002", "Azucar rubia 1kg",             4.20m, "7750001000105", "UND", false, false,   100m, 10m),
+            ("Yogures",    "YOG-001", "Yogurt de fresa 1 L",          7.50m, "7750001000136", "UND", false, false,    12m, 3m),
+            ("Yogures",    "YOG-002", "Yogurt natural 500 g",         4.50m, "7750001000143", "UND", false, false,     9m, 3m),
+            ("Quesos",     "QUE-001", "Queso fresco (por kilo)",     28.00m, "7750001000129", "KG",  false,  true, 4.250m, 1m),
+            ("Quesos",     "QUE-002", "Queso edam tajado 200 g",      9.90m, "7750001000150", "UND", false, false,     9m, 3m)
         };
 
         foreach (var p in seedProducts)
@@ -179,8 +222,8 @@ public static class DbSeeder
                 CategoryId = category.Id,
                 Price = p.Price,
                 Unit = p.Unit,
-                Stock = 100,
-                MinStock = 10,
+                Stock = p.Stock,
+                MinStock = p.MinStock,
                 SoldByWeight = p.ByWeight,
                 IsProduced = p.Produced,
                 IsActive = true,

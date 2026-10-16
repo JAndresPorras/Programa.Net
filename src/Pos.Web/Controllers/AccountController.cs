@@ -113,10 +113,32 @@ public class AccountController(
     [HttpGet]
     [AllowAnonymous]
     [Route("Cuenta/SinPermiso")]
-    public IActionResult AccessDenied()
+    public IActionResult AccessDenied(string? returnUrl = null)
     {
+        // La pantalla inicial es el punto de venta. Quien no vende (por ejemplo el rol
+        // informes_admin) no debe ver "acceso denegado" al ingresar: va a su pantalla.
+        var home = returnUrl?.TrimEnd('/').ToLowerInvariant();
+        if (User.Identity?.IsAuthenticated == true &&
+            !User.HasPermission(Permissions.PosSell) &&
+            (string.IsNullOrEmpty(home) && returnUrl is not null || home is "/pos" or "/pos/index"))
+        {
+            return Redirect(LandingUrl());
+        }
+
         ViewData["Title"] = "Acceso denegado";
+        ViewBag.HomeUrl = LandingUrl();
         return View();
+    }
+
+    /// <summary>Primera pantalla que el usuario puede usar segun sus permisos.</summary>
+    private string LandingUrl()
+    {
+        if (User.HasPermission(Permissions.PosSell)) return Url.Action("Index", "Pos")!;
+        if (User.HasPermission(Permissions.InventoryManage)) return Url.Action("Index", "Inventory")!;
+        if (User.HasPermission(Permissions.ReportsSales)) return Url.Action("Index", "Reports")!;
+        if (User.HasPermission(Permissions.ReportsProduction)) return Url.Action("Production", "Reports")!;
+        if (User.HasPermission(Permissions.ProductsView)) return Url.Action("Index", "Products")!;
+        return Url.Action("Profile", "Account")!;
     }
 
     [HttpGet]

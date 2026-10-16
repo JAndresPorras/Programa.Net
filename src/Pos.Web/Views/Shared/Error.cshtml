@@ -1,5 +1,7 @@
 @{
     ViewData["Title"] = "Ocurrió un error";
+    // Si el error ocurre antes de ingresar no hay menú que mostrar.
+    Layout = User.Identity?.IsAuthenticated == true ? "_Layout" : "_LoginLayout";
 }
 <div class="page-head">
     <div>

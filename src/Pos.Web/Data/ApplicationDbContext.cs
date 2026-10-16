@@ -22,6 +22,7 @@ public abstract class ApplicationDbContext(DbContextOptions options)
     public DbSet<CashMovement> CashMovements => Set<CashMovement>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -38,6 +39,11 @@ public abstract class ApplicationDbContext(DbContextOptions options)
         builder.Entity<Category>(e =>
         {
             e.HasIndex(c => c.Name).IsUnique();
+            // Una categoria principal con subcategorias no se puede borrar sin antes moverlas.
+            e.HasOne(c => c.ParentCategory)
+                .WithMany(c => c.SubCategories)
+                .HasForeignKey(c => c.ParentCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Product>(e =>
@@ -114,6 +120,16 @@ public abstract class ApplicationDbContext(DbContextOptions options)
             e.HasOne(m => m.CashSession)
                 .WithMany(c => c.Movements)
                 .HasForeignKey(m => m.CashSessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<InventoryMovement>(e =>
+        {
+            e.HasIndex(m => new { m.ProductId, m.CreatedAt });
+            e.HasIndex(m => m.SaleId);
+            e.HasOne(m => m.Product)
+                .WithMany()
+                .HasForeignKey(m => m.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

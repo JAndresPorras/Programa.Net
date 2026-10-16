@@ -12,8 +12,8 @@
             Su usuario no cuenta con el permiso necesario para abrir esta pantalla.
             Solicite el acceso al administrador del sistema.
         </p>
-        <a class="btn btn-primary login-btn" asp-controller="Pos" asp-action="Index">
-            <svg class="icon"><use href="#i-back"></use></svg> Volver al punto de venta
+        <a class="btn btn-primary login-btn" href="@(ViewBag.HomeUrl ?? Url.Action("Index", "Pos"))">
+            <svg class="icon"><use href="#i-back"></use></svg> Volver al inicio
         </a>
     </section>
 </div>

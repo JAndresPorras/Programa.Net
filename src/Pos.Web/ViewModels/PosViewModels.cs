@@ -22,7 +22,12 @@ public class CartStateDto
     public string TotalText { get; set; } = string.Empty;
     public List<QuickAmountDto> QuickAmounts { get; set; } = [];
 
-    public static CartStateDto From(Cart cart, CurrencyInfo currency, bool roundTotalToCash)
+    /// <param name="trackedStock">
+    /// Existencias digitales de los productos del ticket que estan en el inventario
+    /// personalizado. Solo sirve para mostrarlas: nunca impide vender.
+    /// </param>
+    public static CartStateDto From(Cart cart, CurrencyInfo currency, bool roundTotalToCash,
+                                    IReadOnlyDictionary<int, decimal>? trackedStock = null)
     {
         // Igual que al cerrar la venta: se suman las lineas ya redondeadas.
         var subtotal = currency.Round(cart.Lines.Sum(l => currency.Round(l.LineTotal)));
@@ -32,7 +37,8 @@ public class CartStateDto
 
         return new CartStateDto
         {
-            Lines = cart.Lines.Select(l => CartLineDto.From(l, currency)).ToList(),
+            Lines = cart.Lines.Select(l => CartLineDto.From(l, currency,
+                trackedStock is not null && trackedStock.TryGetValue(l.ProductId, out var stock) ? stock : null)).ToList(),
             Subtotal = subtotal,
             Discount = discount,
             Total = rounded,
@@ -72,8 +78,27 @@ public class CartLineDto
     public string LineTotalText { get; set; } = string.Empty;
     public string QuantityText { get; set; } = string.Empty;
 
-    public static CartLineDto From(CartLine l, CurrencyInfo currency) => new()
+    /// <summary>El producto esta en el inventario personalizado.</summary>
+    public bool TrackInventory { get; set; }
+
+    /// <summary>Existencia digital (solo si TrackInventory).</summary>
+    public decimal? Stock { get; set; }
+
+    public string? StockText { get; set; }
+
+    /// <summary>Lo que hay en el ticket supera el inventario digital. Solo informa.</summary>
+    public bool StockShort { get; set; }
+
+    public static CartLineDto From(CartLine l, CurrencyInfo currency, decimal? trackedStock = null) => new()
     {
+        TrackInventory = trackedStock.HasValue,
+        Stock = trackedStock,
+        StockText = trackedStock.HasValue
+            ? (l.SoldByWeight
+                ? trackedStock.Value.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)
+                : EscPosPrinter.FormatQuantity(trackedStock.Value))
+            : null,
+        StockShort = trackedStock.HasValue && l.Quantity > trackedStock.Value,
         ProductId = l.ProductId,
         Code = l.Code,
         Name = l.Name,
@@ -134,4 +159,5 @@ public record CheckoutApiRequest(
     string PaymentMethod,
     string? CustomerName,
     string? CustomerDocument,
-    string? Notes);
+    string? Notes,
+    bool ConfirmStockShortage = false);

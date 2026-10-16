@@ -72,6 +72,12 @@ public class ProductFormViewModel
     public bool RemoveImage { get; set; }
 
     public decimal OriginalPrice { get; set; }
+
+    /// <summary>Stock que tenia el producto al abrir el formulario.</summary>
+    public decimal OriginalStock { get; set; }
+
+    /// <summary>Esta en el inventario personalizado: su stock se maneja desde Inventario.</summary>
+    public bool TrackInventory { get; set; }
     public List<Category> Categories { get; set; } = [];
     public List<PriceHistory> PriceHistory { get; set; } = [];
     public bool CanChangePrice { get; set; } = true;

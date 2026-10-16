@@ -10,12 +10,22 @@ public record CheckoutRequest(
     PaymentMethod PaymentMethod,
     string? CustomerName,
     string? CustomerDocument,
-    string? Notes);
+    string? Notes,
+    bool ConfirmStockShortage = false);
 
 public record CheckoutResult(bool Success, string? Error, Sale? Sale)
 {
+    /// <summary>Productos del inventario que no alcanzan. Solo informa: se confirma y se vende igual.</summary>
+    public IReadOnlyList<StockShortage> Shortages { get; init; } = [];
+
+    /// <summary>La venta no se cerro todavia porque falta que la cajera confirme el faltante.</summary>
+    public bool NeedsStockConfirmation => !Success && Shortages.Count > 0;
+
     public static CheckoutResult Fail(string error) => new(false, error, null);
     public static CheckoutResult Ok(Sale sale) => new(true, null, sale);
+
+    public static CheckoutResult ConfirmShortage(IReadOnlyList<StockShortage> shortages) =>
+        new(false, "El inventario digital no alcanza para algunos productos.", null) { Shortages = shortages };
 }
 
 public interface ISaleService
@@ -34,6 +44,7 @@ public class SaleService(
     ApplicationDbContext db,
     ISettingsService settings,
     ICashSessionService cashSessions,
+    IInventoryService inventory,
     ILogger<SaleService> logger) : ISaleService
 {
     public async Task<string> NextNumberAsync(string series, CancellationToken ct = default)
@@ -104,6 +115,15 @@ public class SaleService(
             ? currency.Round(received - total)
             : 0m;
 
+        // Inventario personalizado: si lo digital no alcanza se avisa antes de
+        // cerrar. Es solo informativo: con la confirmacion la venta sale igual.
+        if (!request.ConfirmStockShortage)
+        {
+            var shortages = await inventory.FindShortagesAsync(
+                cart.Lines.Select(l => new InventoryLine(l.ProductId, l.Quantity)), ct);
+            if (shortages.Count > 0) return CheckoutResult.ConfirmShortage(shortages);
+        }
+
         var session = await cashSessions.GetOpenSessionAsync(userId, ct);
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -150,10 +170,12 @@ public class SaleService(
 
             db.Sales.Add(sale);
 
+            // Control de stock global de antes: sigue igual, pero solo para los
+            // productos que no estan en el inventario personalizado.
             if (config.PosStockControl)
             {
                 var ids = cart.Lines.Select(l => l.ProductId).ToList();
-                var products = await db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
+                var products = await db.Products.Where(p => ids.Contains(p.Id) && !p.TrackInventory).ToListAsync(ct);
                 foreach (var product in products)
                 {
                     var sold = cart.Lines.Where(l => l.ProductId == product.Id).Sum(l => l.Quantity);
@@ -162,6 +184,10 @@ public class SaleService(
             }
 
             await db.SaveChangesAsync(ct);
+
+            // Con la venta ya guardada (tiene numero), sale del inventario personalizado.
+            await inventory.RegisterSaleAsync(sale, userId, userName, ct);
+
             await transaction.CommitAsync(ct);
 
             logger.LogInformation("Venta {Number} cerrada por {User} por {Total}", sale.Number, userName, total);
@@ -178,6 +204,10 @@ public class SaleService(
     public async Task<CheckoutResult> CancelAsync(
         int saleId, int userId, string userName, string reason, CancellationToken ct = default)
     {
+        // El estado se lee dentro de la transaccion: dos anulaciones simultaneas del
+        // mismo recibo no pueden devolver el stock dos veces.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
         var sale = await db.Sales.Include(s => s.Items).FirstOrDefaultAsync(s => s.Id == saleId, ct);
         if (sale is null) return CheckoutResult.Fail("El recibo no existe.");
         if (sale.Status == SaleStatus.Cancelled) return CheckoutResult.Fail("El recibo ya estaba anulado.");
@@ -187,11 +217,14 @@ public class SaleService(
         sale.CancelledByUserId = userId;
         sale.CancelReason = reason;
 
+        // El inventario personalizado devuelve exactamente lo que desconto.
+        await inventory.RegisterCancellationAsync(sale, userId, userName, ct);
+
         var config = await settings.GetAsync(ct);
         if (config.PosStockControl)
         {
             var ids = sale.Items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).ToList();
-            var products = await db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
+            var products = await db.Products.Where(p => ids.Contains(p.Id) && !p.TrackInventory).ToListAsync(ct);
             foreach (var product in products)
             {
                 var qty = sale.Items.Where(i => i.ProductId == product.Id).Sum(i => i.Quantity);
@@ -200,6 +233,7 @@ public class SaleService(
         }
 
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         logger.LogWarning("Venta {Number} anulada por {User}: {Reason}", sale.Number, userName, reason);
         return CheckoutResult.Ok(sale);
     }
