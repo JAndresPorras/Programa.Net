@@ -170,7 +170,7 @@ public static class DbSeeder
     {
         if (await db.Categories.AnyAsync()) return;
 
-        var lacteos = new Category { Name = "Lacteos", Description = "Leche, yogures y quesos", Color = "#2563eb" };
+        var lacteos = new Category { Name = "Lácteos", Description = "Leche, yogures y quesos", Color = "#2563eb" };
         var categories = new List<Category>
         {
             new() { Name = "Panaderia",  Description = "Pan y productos de horno", Color = "#d97706" },

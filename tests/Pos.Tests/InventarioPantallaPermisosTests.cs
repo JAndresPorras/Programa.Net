@@ -118,7 +118,7 @@ public class InventarioPantallaPermisosTests
         var buscar = await admin.GetJsonAsync("/Inventory/Search?term=yogurt");
         Assert.Equal(2, buscar.GetArrayLength());
         var todos = await admin.GetJsonAsync("/Inventory/Search");
-        Assert.All(todos.EnumerateArray(), x => Assert.Contains("Lacteos ›", x.GetProperty("categoryName").GetString()));
+        Assert.All(todos.EnumerateArray(), x => Assert.Contains("Lácteos ›", x.GetProperty("categoryName").GetString()));
 
         var agregado = await Post("Track", new { productId = id });
         Assert.True(agregado.GetProperty("success").GetBoolean());
@@ -209,7 +209,7 @@ public class InventarioPantallaPermisosTests
 
         var fresco = filas.Single(r => r.Cell(1).GetString() == "QUE-001");
         Assert.Equal("Queso fresco (por kilo)", fresco.Cell(2).GetString());
-        Assert.Equal("Lacteos › Quesos", fresco.Cell(3).GetString());
+        Assert.Equal("Lácteos › Quesos", fresco.Cell(3).GetString());
         Assert.Equal(5.75, fresco.Cell(5).GetDouble(), 3);
         Assert.Equal("0.000", fresco.Cell(5).Style.NumberFormat.Format);
 
@@ -252,21 +252,21 @@ public class InventarioPantallaPermisosTests
     {
         await using var app = new PosAppFactory();
         var admin = await PosClient.LoginAsync(app);
-        var lacteos = await app.DbAsync(db => db.Categories.FirstAsync(c => c.Name == "Lacteos"));
+        var lacteos = await app.DbAsync(db => db.Categories.FirstAsync(c => c.Name == "Lácteos"));
         var quesos = await app.DbAsync(db => db.Categories.FirstAsync(c => c.Name == "Quesos"));
 
         // Lacteos dentro de Quesos: Quesos ya es subcategoria.
         var ciclo = await admin.PostFormAsync("/Categories/Edit", $"/Categories/Edit/{lacteos.Id}", new()
         {
-            ["Id"] = lacteos.Id.ToString(), ["Name"] = "Lacteos", ["Color"] = "#2563eb",
+            ["Id"] = lacteos.Id.ToString(), ["Name"] = "Lácteos", ["Color"] = "#2563eb",
             ["IsActive"] = "true", ["ParentCategoryId"] = quesos.Id.ToString()
         });
         Assert.Equal(HttpStatusCode.OK, ciclo.StatusCode);
-        Assert.Null((await app.DbAsync(db => db.Categories.FirstAsync(c => c.Name == "Lacteos"))).ParentCategoryId);
+        Assert.Null((await app.DbAsync(db => db.Categories.FirstAsync(c => c.Name == "Lácteos"))).ParentCategoryId);
 
         var borrar = await admin.PostFormAsync($"/Categories/Delete/{lacteos.Id}", "/Categories", new());
         Assert.Equal(HttpStatusCode.Redirect, borrar.StatusCode);
-        Assert.True(await app.DbAsync(db => db.Categories.AnyAsync(c => c.Name == "Lacteos")));
+        Assert.True(await app.DbAsync(db => db.Categories.AnyAsync(c => c.Name == "Lácteos")));
 
         // Habilitar el inventario de una categoria desde su formulario.
         var bebidas = await app.DbAsync(db => db.Categories.FirstAsync(c => c.Name == "Bebidas"));

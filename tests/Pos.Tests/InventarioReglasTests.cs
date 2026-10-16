@@ -182,6 +182,6 @@ public class InventarioReglasTests
         var fila = (await app.ServiceAsync<IInventoryService, List<InventoryRow>>(s => s.TrackedRowsAsync())).Single();
         Assert.Equal(8m, fila.Stock);
         Assert.NotNull(fila.LastManualAt);
-        Assert.Equal("Lacteos › Quesos", fila.CategoryName);
+        Assert.Equal("Lácteos › Quesos", fila.CategoryName);
     }
 }
